@@ -1,0 +1,23 @@
+{
+  "name": "minecraft-hrl-agent",
+  "version": "1.0.0",
+  "description": "Hierarchical RL agent for Minecraft using Options Framework",
+  "main": "src/index.js",
+  "scripts": {
+    "start": "node src/index.js",
+    "dev": "nodemon src/index.js"
+  },
+  "dependencies": {
+    "mineflayer": "^4.14.0",
+    "mineflayer-pathfinder": "^2.4.4",
+    "mineflayer-collectblock": "^1.4.1",
+    "mineflayer-pvp": "^1.3.2",
+    "mineflayer-tool": "^1.2.0",
+    "prismarine-viewer": "^1.28.0",
+    "vec3": "^0.1.10",
+    "ws": "^8.16.0"
+  },
+  "devDependencies": {
+    "nodemon": "^3.0.2"
+  }
+}
