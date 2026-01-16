@@ -1,0 +1,51 @@
+# Node.js (Mineflayer)
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+package-lock.json
+yarn.lock
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+.venv/
+ENV/
+.env
+*.egg-info/
+.eggs/
+dist/
+build/
+*.egg
+
+# pip
+pip-log.txt
+pip-delete-this-directory.txt
+
+# Training Artifacts
+# Checkpoints
+checkpoints/
+*.zip
+*.pt
+*.pth
+
+# Logs
+logs/
+*.log
+tensorboard/
+
+# Stable-Baselines3
+sb3_logs/
+
+# IDE / Editor
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
