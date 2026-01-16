@@ -1,6 +1,6 @@
 # Minecraft Hierarchical Reinforcement Learning Agent
 
-A research-grade implementation of Hierarchical Reinforcement Learning (HRL) for Minecraft, built for USC CSCI 566 (Deep Learning). This project implements the **Options Framework** to enable sample-efficient learning of complex tasks.
+A research-grade implementation of Hierarchical Reinforcement Learning (HRL) for Minecraft. This project implements the **Options Framework** to enable sample-efficient learning of complex tasks.
 
 ## 🎯 Project Overview
 
