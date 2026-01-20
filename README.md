@@ -86,7 +86,7 @@ minecraft-hrl-agent/
 
 ```bash
 # Clone the repository
-git clone <your-repo-url>
+git clone https://github.com/Romeo-5/minecraft-hrl-agent.git
 cd minecraft-hrl-agent
 
 # Install Mineflayer dependencies
