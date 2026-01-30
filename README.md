@@ -276,4 +276,3 @@ MIT License - See LICENSE file for details.
 
 - Mineflayer community for the excellent bot framework
 - Stable-Baselines3 team for the RL implementations
-- USC CSCI 566 course staff
