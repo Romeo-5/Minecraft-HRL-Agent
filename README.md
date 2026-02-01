@@ -117,6 +117,10 @@ npm start
 ```bash
 cd python
 
+# Activate virtual environment
+source venv/bin/activate  # On macOS/Linux
+# or: venv\Scripts\activate  # On Windows
+
 # Hybrid mode (RL + novelty exploration)
 python main.py --mode hybrid --timesteps 100000
 
@@ -126,6 +130,26 @@ python main.py --mode pure_rl --policy PPO --timesteps 50000
 # Heuristic demo (no learning)
 python main.py --mode heuristic
 ```
+
+**Step 4: Access Prismarine Viewer**
+
+Once the bot is running, open your web browser and navigate to:
+```
+http://localhost:3007
+```
+
+The viewer provides:
+- **3D first-person perspective** of the bot's view
+- **Real-time world rendering** as the bot moves and interacts
+- **Visual confirmation** of skill execution (harvesting, mining, crafting)
+- **Interactive camera controls** (click and drag to look around)
+
+**Viewer Controls:**
+- Left click and drag: Rotate camera
+- Scroll: Zoom in/out
+- Right click: Pan camera
+
+The viewer automatically updates as the bot executes skills, allowing you to watch the agent learn and explore the Minecraft world in real-time.
 
 ## 🎮 Skill Library
 
@@ -193,6 +217,7 @@ export MC_HOST=localhost
 export MC_PORT=25565
 export MC_USERNAME=HRL_Agent
 export BRIDGE_PORT=8765
+export VIEWER_PORT=3007  # Prismarine viewer HTTP port
 ```
 
 ### Training Arguments

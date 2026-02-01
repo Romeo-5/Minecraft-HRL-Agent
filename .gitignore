@@ -49,3 +49,6 @@ sb3_logs/
 *.swo
 *~
 .DS_Store
+
+# Minecraft server
+minecraft-server/

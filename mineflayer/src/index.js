@@ -15,12 +15,14 @@
  *   MC_PORT - Minecraft server port (default: 25565)
  *   MC_USERNAME - Bot username (default: HRL_Agent)
  *   BRIDGE_PORT - WebSocket bridge port (default: 8765)
+ *   VIEWER_PORT - Prismarine viewer HTTP port (default: 3007)
  */
 
 const mineflayer = require('mineflayer');
 const { pathfinder } = require('mineflayer-pathfinder');
 const toolPlugin = require('mineflayer-tool').plugin;
 const collectBlock = require('mineflayer-collectblock').plugin;
+const { mineflayer: mineflayerViewer } = require('prismarine-viewer');
 
 const SkillManager = require('./skillManager');
 const Bridge = require('./bridge');
@@ -31,6 +33,7 @@ const config = {
     port: parseInt(process.env.MC_PORT) || 25565,
     username: process.env.MC_USERNAME || 'HRL_Agent',
     bridgePort: parseInt(process.env.BRIDGE_PORT) || 8765,
+    viewerPort: parseInt(process.env.VIEWER_PORT) || 3007,
     version: process.env.MC_VERSION || '1.20.1'  // Specify version for stability
 };
 
@@ -41,6 +44,7 @@ console.log(`Configuration:`);
 console.log(`  Server: ${config.host}:${config.port}`);
 console.log(`  Username: ${config.username}`);
 console.log(`  Bridge Port: ${config.bridgePort}`);
+console.log(`  Viewer Port: ${config.viewerPort}`);
 console.log(`  MC Version: ${config.version}`);
 console.log('='.repeat(60));
 
@@ -62,15 +66,25 @@ bot.on('spawn', () => {
     console.log('[Bot] Spawned in world!');
     console.log(`[Bot] Position: ${bot.entity.position}`);
     console.log(`[Bot] Health: ${bot.health}, Food: ${bot.food}`);
-    
+
     // Initialize skill manager
     skillManager = new SkillManager(bot);
     console.log(`[Bot] Skill Manager initialized with ${skillManager.getActionSpaceSize()} skills`);
-    
+
     // Start the bridge
     bridge = new Bridge(bot, skillManager, config.bridgePort);
     bridge.start();
-    
+
+    // Initialize prismarine viewer
+    try {
+        mineflayerViewer(bot, { port: config.viewerPort, firstPerson: true });
+        console.log(`[Viewer] Prismarine viewer started at http://localhost:${config.viewerPort}`);
+        console.log(`[Viewer] Open this URL in your browser to watch the bot!`);
+    } catch (err) {
+        console.error('[Viewer] Failed to start prismarine viewer:', err.message);
+        console.log('[Viewer] Bot will continue without viewer');
+    }
+
     console.log('[Bot] Ready for Python agent connection!');
 });
 
