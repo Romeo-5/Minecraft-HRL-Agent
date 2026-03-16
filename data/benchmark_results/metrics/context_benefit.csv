@@ -1,0 +1,2 @@
+model,n_paired_samples,context_benefit_coverage,context_benefit_efficiency,context_benefit_shortcut,p_value_coverage,p_value_efficiency,p_value_shortcut
+llama3.2:3b,105,0.0423,0.0041,0.94,0.010613,0.778804,0.0

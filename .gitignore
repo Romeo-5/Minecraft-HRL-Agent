@@ -50,5 +50,8 @@ sb3_logs/
 *~
 .DS_Store
 
+# Benchmark results (generated, not tracked)
+data/benchmark_results/raw_responses
+
 # Minecraft server
 minecraft-server/

@@ -1,0 +1,3 @@
+model,condition,mean_step_coverage,std_step_coverage,shortcut_detection_rate,mean_efficiency_score,std_efficiency_score,n_samples
+llama3.2:3b,with_context,0.1655,0.2089,0.96,0.6521,0.2473,105
+llama3.2:3b,without_context,0.1232,0.1671,0.02,0.648,0.2543,105
