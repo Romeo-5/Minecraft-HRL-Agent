@@ -3,9 +3,13 @@ validate_dataset.py
 
 Validates dataset_final.json against Sombaudy's tech tree DAG (training_config.json).
 
-For each sample's reasoning_path, checks that skills appear in a tier-consistent
-order according to the DAG — i.e., no skill produces an item that requires
-something only available at a higher tier later in the same path.
+For each sample's reasoning_path, checks that skills appear in a prerequisite-valid
+order — i.e., no skill produces an item that requires something that only appears
+LATER in the same path.
+
+Uses transitive prerequisite closure rather than tier ordering, eliminating false
+positives from parallel prerequisite relationships (e.g. craft_furnace → mine_iron_ore
+is valid since iron_ore is NOT a prerequisite of furnace).
 
 Structure-shortcut paths (where loot skills bypass normal prerequisites) are
 handled by marking loot/navigate skills as tier-agnostic.
@@ -14,36 +18,37 @@ Usage:
     python data/validate_dataset.py
     python data/validate_dataset.py --dataset data/processed/dataset_final.json
                                     --tech-tree /path/to/training_config.json
-                                    --strict
 """
 
 import argparse
 import json
 import os
 import sys
+from collections import defaultdict
 
 # ---------------------------------------------------------------------------
 # Skill → tech tree node mapping
 # Maps our action-based skill vocab to Sombaudy's item/node names.
-# Skills not listed here are "tier-agnostic" (structure shortcuts, navigation,
-# biome-specific foraging) and are skipped in tier validation.
+# Skills not listed here are "agnostic" (structure shortcuts, navigation,
+# biome-specific foraging) and are skipped in prerequisite validation.
 # ---------------------------------------------------------------------------
 SKILL_TO_NODE = {
-    "harvest_wood":           "wood_log",          # tier 0
-    "craft_planks_and_sticks": "planks",            # tier 1
-    "craft_crafting_table":   "crafting_table",     # tier 2
-    "craft_wooden_pickaxe":   "wooden_pickaxe",     # tier 3
-    "craft_torch":            "torch",              # tier 4
-    "mine_stone":             "stone",              # tier 4
-    "craft_furnace":          "furnace",            # tier 5
-    "craft_stone_pickaxe":    "stone_pickaxe",      # tier 5
-    "mine_iron_ore":          "iron_ore",           # tier 6
-    "smelt_iron":             "iron_ingot",         # tier 6
-    "craft_iron_pickaxe":     "iron_pickaxe",       # tier 7
-    "craft_iron_armor_set":   "full_iron",          # tier 7
-    "mine_diamonds":          "diamond",            # tier 8
-    "craft_diamond_pickaxe":  "diamond_pickaxe",    # tier 9
-    # gold/coal not in tech tree — skipped
+    "harvest_wood":            "wood_log",        # tier 0
+    "craft_planks_and_sticks": "planks",           # tier 1
+    "craft_crafting_table":    "crafting_table",   # tier 2
+    "craft_wooden_pickaxe":    "wooden_pickaxe",   # tier 3
+    "mine_stone":              "stone",            # tier 4
+    "mine_coal":               "coal",             # tier 4
+    "craft_torch":             "torch",            # tier 4
+    "craft_furnace":           "furnace",          # tier 5
+    "craft_stone_pickaxe":     "stone_pickaxe",    # tier 5
+    "mine_iron_ore":           "iron_ore",         # tier 6
+    "smelt_iron":              "iron_ingot",       # tier 6
+    "craft_iron_pickaxe":      "iron_pickaxe",     # tier 7
+    "craft_iron_armor_set":    "full_iron",        # tier 7
+    "mine_diamonds":           "diamond",          # tier 8
+    "craft_diamond_pickaxe":   "diamond_pickaxe",  # tier 9
+    # gold/shelter/food — not in tech tree, treated as agnostic
 }
 
 # ---------------------------------------------------------------------------
@@ -64,7 +69,6 @@ AGNOSTIC_SKILLS = {
     "build_walls_and_roof", "craft_and_place_door", "place_torches",
     "dig_to_diamond_level", "dig_to_gold_level",
     "mine_gold_ore", "smelt_gold",
-    "mine_stone",   # already mapped but can appear in structure paths safely
 }
 
 
@@ -73,53 +77,89 @@ def load_json(path):
         return json.load(f)
 
 
-def build_tier_map(tech_tree):
-    """Return {node_id: tier} from tech tree tiers dict."""
-    tier_map = {}
-    for tier_str, nodes in tech_tree["tiers"].items():
-        for node in nodes:
-            tier_map[node] = int(tier_str)
-    return tier_map
-
-
-def validate_sample(sample, tier_map, strict=False):
+def build_prereq_closure(tech_tree):
     """
-    Check that mapped skills appear in non-decreasing tier order.
+    Build transitive prerequisite closure from tech tree DAG.
+
+    Returns ancestors: {node_id: set of node_ids that must be obtained before it}
+
+    A node's ancestors = its direct requires + all of their ancestors (transitive).
+    """
+    # nodes is a dict {node_id: node_data}
+    nodes = tech_tree["nodes"]
+
+    # Direct prerequisites: what each node immediately requires
+    direct_requires = {nid: set(node.get("requires", [])) for nid, node in nodes.items()}
+
+    # Compute transitive closure via memoised DFS
+    ancestors = {}
+
+    def get_ancestors(node_id, visited=None):
+        if node_id in ancestors:
+            return ancestors[node_id]
+        if visited is None:
+            visited = set()
+        if node_id in visited:
+            return set()  # cycle guard (shouldn't exist in a DAG)
+        visited.add(node_id)
+
+        result = set()
+        for req in direct_requires.get(node_id, []):
+            result.add(req)
+            result |= get_ancestors(req, visited)
+
+        ancestors[node_id] = result
+        return result
+
+    for nid in nodes:
+        get_ancestors(nid)
+
+    return ancestors
+
+
+def validate_sample(sample, ancestors):
+    """
+    Check that no skill appears before another skill whose node is a prerequisite
+    of the first skill's node.
+
+    For every pair (i < j) of mapped skills in the path:
+      Violation if node(skill[j]) ∈ ancestors[node(skill[i])]
+      (skill[j]'s output is needed to produce skill[i]'s output, but skill[i] comes first)
+
     Returns list of violation dicts (empty = valid).
     """
     path = sample.get("reasoning_path", [])
     violations = []
-    last_tier = -1
-    last_skill = None
 
-    for skill in path:
+    # Extract only the mapped skills with their positions
+    mapped = []
+    for idx, skill in enumerate(path):
         node = SKILL_TO_NODE.get(skill)
-        if node is None:
-            continue  # tier-agnostic or unmapped — skip
+        if node is not None and skill not in AGNOSTIC_SKILLS:
+            mapped.append((idx, skill, node))
 
-        tier = tier_map.get(node)
-        if tier is None:
-            continue  # node not in tech tree — skip
+    # Check all pairs (i, j) where i < j
+    for i in range(len(mapped)):
+        for j in range(i + 1, len(mapped)):
+            idx_i, skill_i, node_i = mapped[i]
+            idx_j, skill_j, node_j = mapped[j]
 
-        if tier < last_tier:
-            violations.append({
-                "skill": skill,
-                "node": node,
-                "tier": tier,
-                "previous_skill": last_skill,
-                "previous_tier": last_tier,
-                "message": (
-                    f"'{skill}' (tier {tier}) appears after "
-                    f"'{last_skill}' (tier {last_tier}) — prerequisite violated"
-                ),
-            })
-            if not strict:
-                # Don't update last_tier on violation so we keep tracking from
-                # the highest tier seen, catching all further regressions.
-                continue
-
-        last_tier = tier
-        last_skill = skill
+            # skill_i appears before skill_j in the path.
+            # Violation: node_j is a prerequisite OF node_i
+            # (meaning node_j should come first, but skill_i appears at position idx_i < idx_j)
+            if node_j in ancestors.get(node_i, set()):
+                violations.append({
+                    "skill": skill_i,
+                    "node": node_i,
+                    "position": idx_i,
+                    "prereq_skill": skill_j,
+                    "prereq_node": node_j,
+                    "prereq_position": idx_j,
+                    "message": (
+                        f"'{skill_i}' (pos {idx_i}) requires '{skill_j}' (pos {idx_j}) "
+                        f"as a prerequisite, but '{skill_j}' appears later in the path"
+                    ),
+                })
 
     return violations
 
@@ -135,8 +175,8 @@ def main():
         default="/Users/romeonickel/Documents/GitHub/MC_Tech_Tree/training_config.json",
     )
     parser.add_argument(
-        "--strict", action="store_true",
-        help="Stop updating tier baseline on violation (catches cascading errors)"
+        "--verbose", action="store_true",
+        help="Print all invalid samples (default: cap at 20)"
     )
     args = parser.parse_args()
 
@@ -150,10 +190,10 @@ def main():
 
     dataset = load_json(args.dataset)
     tech_tree = load_json(args.tech_tree)
-    tier_map = build_tier_map(tech_tree)
+    ancestors = build_prereq_closure(tech_tree)
 
     print(f"Loaded {len(dataset)} samples")
-    print(f"Tech tree nodes: {len(tier_map)} with tier assignments")
+    print(f"Tech tree nodes: {len(ancestors)} with prerequisite closure")
     print(f"Skills mapped to tech tree: {len(SKILL_TO_NODE)}\n")
 
     # ── Validate ──────────────────────────────────────────────────────────────
@@ -161,66 +201,66 @@ def main():
     total_violations = 0
 
     for sample in dataset:
-        violations = validate_sample(sample, tier_map, strict=args.strict)
+        violations = validate_sample(sample, ancestors)
         if violations:
             invalid_samples.append((sample, violations))
             total_violations += len(violations)
 
     # ── Report ────────────────────────────────────────────────────────────────
     valid = len(dataset) - len(invalid_samples)
-    print(f"{'='*55}")
+    print(f"{'='*60}")
     print(f"Valid samples:    {valid} / {len(dataset)}")
     print(f"Invalid samples:  {len(invalid_samples)}")
     print(f"Total violations: {total_violations}")
-    print(f"{'='*55}")
+    print(f"{'='*60}")
 
+    cap = len(invalid_samples) if args.verbose else 20
     if invalid_samples:
-        print(f"\nInvalid samples detail:\n")
-        for sample, violations in invalid_samples[:20]:  # cap at 20
+        print(f"\nInvalid samples detail (showing up to {cap}):\n")
+        for sample, violations in invalid_samples[:cap]:
             print(f"  Sample {sample['id']} | biome={sample['biome']} "
                   f"task={sample['task']} source={sample.get('source','?')}")
             print(f"  Path: {sample['reasoning_path']}")
             for v in violations:
                 print(f"    ✗ {v['message']}")
             print()
-        if len(invalid_samples) > 20:
-            print(f"  ... and {len(invalid_samples)-20} more.")
+        if len(invalid_samples) > cap:
+            print(f"  ... and {len(invalid_samples) - cap} more. Use --verbose to see all.")
 
         # Summarize by violation type
         print(f"\nMost common violations:")
         counts = {}
         for _, violations in invalid_samples:
             for v in violations:
-                key = f"{v['previous_skill']} → {v['skill']}"
+                key = f"{v['skill']} before {v['prereq_skill']}"
                 counts[key] = counts.get(key, 0) + 1
         for pair, count in sorted(counts.items(), key=lambda x: -x[1])[:10]:
             print(f"  {count:3}x  {pair}")
     else:
-        print("\nAll samples pass DAG tier ordering.")
+        print("\nAll samples pass DAG prerequisite ordering.")
 
     # ── mine_coal check ───────────────────────────────────────────────────────
-    # Check whether any path uses craft_torch / craft_furnace without first
-    # having a way to get coal (mine_coal is not in our vocab).
-    print(f"\n{'='*55}")
+    print(f"\n{'='*60}")
     print("mine_coal gap check:")
     torch_without_coal = []
+    COAL_SOURCES = {
+        "mine_coal", "loot_blacksmith_chest", "search_mineshaft_chests",
+        "loot_supply_chest", "loot_portal_chest",
+    }
     for s in dataset:
         path = s["reasoning_path"]
         if "craft_torch" in path:
-            # Check if any coal source exists: structure loot or explicit mine_coal
-            has_coal_source = any(skill in path for skill in [
-                "loot_blacksmith_chest", "search_mineshaft_chests",
-                "loot_supply_chest", "loot_portal_chest",
-            ])
+            has_coal_source = any(skill in path for skill in COAL_SOURCES)
             if not has_coal_source:
                 torch_without_coal.append(s["id"])
 
     if torch_without_coal:
-        print(f"  {len(torch_without_coal)} samples use craft_torch with no coal source "
-              f"in path (mine_coal missing from vocab):")
-        print(f"  Sample IDs: {torch_without_coal[:20]}")
+        print(f"  {len(torch_without_coal)} samples use craft_torch with no coal source in path:")
+        print(f"  IDs: {torch_without_coal[:20]}")
+        if len(torch_without_coal) > 20:
+            print(f"  ... and {len(torch_without_coal) - 20} more.")
     else:
-        print("  No samples affected — craft_torch always paired with a loot skill.")
+        print("  No gaps — every craft_torch is paired with a coal source.")
 
 
 if __name__ == "__main__":
