@@ -228,7 +228,10 @@ class Bridge {
         // Important block types to track
         const importantBlocks = [
             'oak_log', 'birch_log', 'spruce_log', 'jungle_log',
-            'stone', 'cobblestone', 'iron_ore', 'coal_ore', 'diamond_ore',
+            'stone', 'cobblestone',
+            'iron_ore', 'deepslate_iron_ore',
+            'coal_ore', 'deepslate_coal_ore',
+            'diamond_ore', 'deepslate_diamond_ore',
             'crafting_table', 'furnace', 'chest',
             'water', 'lava',
             'grass_block', 'dirt', 'sand'
@@ -288,7 +291,15 @@ class Bridge {
         try {
             const pos = this.bot.entity.position;
             const block = this.bot.blockAt(pos);
-            return block?.biome?.name || 'unknown';
+            const biomeId = block?.biome?.id;
+            if (biomeId !== undefined && biomeId !== null) {
+                // Look up name via minecraft-data (mineflayer 4.x doesn't populate biome.name)
+                const mcData = require('minecraft-data')(this.bot.version);
+                const biomeData = mcData.biomes[biomeId];
+                if (biomeData?.name) return biomeData.name;
+                if (biomeData?.displayName) return biomeData.displayName;
+            }
+            return 'unknown';
         } catch {
             return 'unknown';
         }
@@ -390,8 +401,16 @@ class Bridge {
             return true;
         }
         
-        // Goal: Crafted iron pickaxe (a significant milestone)
-        if (this._getInventory()['iron_pickaxe']) {
+        // Goal: Full diamond kit (pickaxe + all 4 armor pieces)
+        const inv = this._getInventory();
+        const fullDiamondKit = [
+            'diamond_pickaxe',
+            'diamond_helmet',
+            'diamond_chestplate',
+            'diamond_leggings',
+            'diamond_boots'
+        ];
+        if (fullDiamondKit.every(item => inv[item])) {
             return true;
         }
         

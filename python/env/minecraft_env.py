@@ -66,21 +66,32 @@ class MinecraftHRLEnv(gym.Env):
     
     # Key items to track in observation (order matters for encoding)
     TRACKED_ITEMS = [
+        # Wood tier
         'oak_log', 'birch_log', 'spruce_log',
         'oak_planks', 'birch_planks', 'spruce_planks',
         'stick', 'crafting_table',
-        'wooden_pickaxe', 'stone_pickaxe', 'iron_pickaxe',
-        'cobblestone', 'stone',
-        'coal', 'raw_iron', 'iron_ingot',
-        'furnace', 'chest',
-        'apple', 'bread', 'cooked_beef'
+        'wooden_pickaxe',
+        # Stone tier
+        'cobblestone', 'stone', 'stone_pickaxe',
+        # Iron tier
+        'coal', 'raw_iron', 'iron_ingot', 'furnace',
+        'iron_pickaxe',
+        'iron_helmet', 'iron_chestplate', 'iron_leggings', 'iron_boots',
+        # Diamond tier
+        'diamond',
+        'diamond_pickaxe',
+        'diamond_helmet', 'diamond_chestplate', 'diamond_leggings', 'diamond_boots',
+        # Food / misc
+        'chest', 'apple', 'bread', 'cooked_beef'
     ]
-    
+
     # Block types to track (order matters for encoding)
     TRACKED_BLOCKS = [
         'oak_log', 'birch_log', 'spruce_log',
         'stone', 'cobblestone',
-        'iron_ore', 'coal_ore', 'diamond_ore',
+        'iron_ore', 'deepslate_iron_ore',
+        'coal_ore', 'deepslate_coal_ore',
+        'diamond_ore', 'deepslate_diamond_ore',
         'crafting_table', 'furnace',
         'water', 'lava'
     ]
@@ -452,6 +463,35 @@ class FlatMinecraftEnv(gym.ObservationWrapper):
             dtype=np.float32
         )
     
+    def _recompute_flat_space(self):
+        """Recompute flat observation space from the inner env's current spaces.
+        Must be called after the inner env's skill count is updated via connect()."""
+        self._obs_keys = list(self.env.observation_space.spaces.keys())
+        self._obs_sizes = {}
+        total_size = 0
+        for key in self._obs_keys:
+            space = self.env.observation_space.spaces[key]
+            if isinstance(space, spaces.Box):
+                size = int(np.prod(space.shape))
+            elif isinstance(space, spaces.MultiBinary):
+                size = space.n
+            else:
+                raise ValueError(f"Unsupported space type: {type(space)}")
+            self._obs_sizes[key] = size
+            total_size += size
+        self.observation_space = spaces.Box(
+            low=-np.inf, high=np.inf,
+            shape=(total_size,),
+            dtype=np.float32
+        )
+
+    def connect(self, timeout: float = 30.0) -> bool:
+        """Connect the inner env and recompute the flat observation space."""
+        result = self.env.unwrapped.connect(timeout=timeout)
+        if result:
+            self._recompute_flat_space()
+        return result
+
     def observation(self, obs: dict) -> np.ndarray:
         """Flatten the observation dict into a single array."""
         parts = []

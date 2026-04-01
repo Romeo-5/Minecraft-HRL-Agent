@@ -11,7 +11,7 @@
  */
 
 const { goals, Movements } = require('mineflayer-pathfinder');
-const { GoalNear, GoalBlock, GoalGetToBlock } = goals;
+const { GoalNear, GoalBlock, GoalGetToBlock, GoalY } = goals;
 
 class SkillManager {
     constructor(bot) {
@@ -167,14 +167,188 @@ class SkillManager {
             }
         });
 
-        // Skill 12: Smelt iron (requires furnace)
+        // Skill 12: Smelt iron (finds/crafts/places furnace automatically)
         this.register({
             id: 12,
             name: 'smelt_iron',
             description: 'Smelt raw iron into iron ingots',
-            preconditions: () => this._hasItem('raw_iron') && this._hasItem('furnace'),
+            preconditions: () => {
+                if (!this._hasItem('raw_iron')) return false;
+                // OK if we have a furnace item, enough cobble to make one, or one already in world
+                if (this._hasItem('furnace')) return true;
+                if (this._countItem('cobblestone') >= 8) return true;
+                const nearby = this.bot.findBlock({ matching: b => b.name === 'furnace', maxDistance: 32 });
+                return nearby !== null;
+            },
             execute: async () => {
                 return await this._smeltItem('raw_iron', 'iron_ingot');
+            }
+        });
+
+        // Skill 13: Craft furnace
+        this.register({
+            id: 13,
+            name: 'craft_furnace',
+            description: 'Craft a furnace from 8 cobblestone',
+            preconditions: () => this._countItem('cobblestone') >= 8,
+            execute: async () => {
+                return await this._craftWithTable('furnace', 1);
+            }
+        });
+
+        // Skill 14: Craft iron pickaxe
+        this.register({
+            id: 14,
+            name: 'craft_iron_pickaxe',
+            description: 'Craft an iron pickaxe (requires 3 iron ingots + 2 sticks + crafting table)',
+            preconditions: () => this._countItem('iron_ingot') >= 3 && this._countItem('stick') >= 2,
+            execute: async () => {
+                return await this._craftWithTable('iron_pickaxe', 1);
+            }
+        });
+
+        // Skill 15: Craft iron helmet
+        this.register({
+            id: 15,
+            name: 'craft_iron_helmet',
+            description: 'Craft an iron helmet (5 iron ingots + crafting table)',
+            preconditions: () => this._countItem('iron_ingot') >= 5,
+            execute: async () => {
+                return await this._craftWithTable('iron_helmet', 1);
+            }
+        });
+
+        // Skill 16: Craft iron chestplate
+        this.register({
+            id: 16,
+            name: 'craft_iron_chestplate',
+            description: 'Craft an iron chestplate (8 iron ingots + crafting table)',
+            preconditions: () => this._countItem('iron_ingot') >= 8,
+            execute: async () => {
+                return await this._craftWithTable('iron_chestplate', 1);
+            }
+        });
+
+        // Skill 17: Craft iron leggings
+        this.register({
+            id: 17,
+            name: 'craft_iron_leggings',
+            description: 'Craft iron leggings (7 iron ingots + crafting table)',
+            preconditions: () => this._countItem('iron_ingot') >= 7,
+            execute: async () => {
+                return await this._craftWithTable('iron_leggings', 1);
+            }
+        });
+
+        // Skill 18: Craft iron boots
+        this.register({
+            id: 18,
+            name: 'craft_iron_boots',
+            description: 'Craft iron boots (4 iron ingots + crafting table)',
+            preconditions: () => this._countItem('iron_ingot') >= 4,
+            execute: async () => {
+                return await this._craftWithTable('iron_boots', 1);
+            }
+        });
+
+        // Skill 19: Dig to diamond level
+        this.register({
+            id: 19,
+            name: 'dig_to_diamond_level',
+            description: 'Dig down to Y=-59 (diamond ore level), requires iron pickaxe',
+            preconditions: () => this._hasItem('iron_pickaxe') && Math.floor(this.bot.entity.position.y) > -50,
+            execute: async () => {
+                return await this._digToY(-59);
+            }
+        });
+
+        // Skill 20: Return to surface
+        this.register({
+            id: 20,
+            name: 'return_to_surface',
+            description: 'Navigate from underground back to the surface (Y>=60)',
+            preconditions: () => Math.floor(this.bot.entity.position.y) < 0,
+            execute: async () => {
+                return await this._returnToSurface();
+            }
+        });
+
+        // Skill 21: Mine diamond ore
+        this.register({
+            id: 21,
+            name: 'mine_diamond',
+            description: 'Mine deepslate diamond ore (requires iron pickaxe, must be at Y<=-50)',
+            preconditions: () => this._hasItem('iron_pickaxe') && Math.floor(this.bot.entity.position.y) <= -50,
+            execute: async () => {
+                return await this._mineBlock('diamond_ore', 3);
+            }
+        });
+
+        // Skill 22: Craft diamond pickaxe
+        this.register({
+            id: 22,
+            name: 'craft_diamond_pickaxe',
+            description: 'Craft a diamond pickaxe (3 diamonds + 2 sticks + crafting table)',
+            preconditions: () => this._countItem('diamond') >= 3 && this._countItem('stick') >= 2,
+            execute: async () => {
+                return await this._craftWithTable('diamond_pickaxe', 1);
+            }
+        });
+
+        // Skill 23: Craft diamond helmet
+        this.register({
+            id: 23,
+            name: 'craft_diamond_helmet',
+            description: 'Craft a diamond helmet (5 diamonds + crafting table)',
+            preconditions: () => this._countItem('diamond') >= 5,
+            execute: async () => {
+                return await this._craftWithTable('diamond_helmet', 1);
+            }
+        });
+
+        // Skill 24: Craft diamond chestplate
+        this.register({
+            id: 24,
+            name: 'craft_diamond_chestplate',
+            description: 'Craft a diamond chestplate (8 diamonds + crafting table)',
+            preconditions: () => this._countItem('diamond') >= 8,
+            execute: async () => {
+                return await this._craftWithTable('diamond_chestplate', 1);
+            }
+        });
+
+        // Skill 25: Craft diamond leggings
+        this.register({
+            id: 25,
+            name: 'craft_diamond_leggings',
+            description: 'Craft diamond leggings (7 diamonds + crafting table)',
+            preconditions: () => this._countItem('diamond') >= 7,
+            execute: async () => {
+                return await this._craftWithTable('diamond_leggings', 1);
+            }
+        });
+
+        // Skill 26: Craft diamond boots
+        this.register({
+            id: 26,
+            name: 'craft_diamond_boots',
+            description: 'Craft diamond boots (4 diamonds + crafting table)',
+            preconditions: () => this._countItem('diamond') >= 4,
+            execute: async () => {
+                return await this._craftWithTable('diamond_boots', 1);
+            }
+        });
+
+        // Skill 27: Clear junk inventory
+        // Drops low-value blocks that clog inventory during deep mining.
+        // Only fires when inventory is nearly full (>=27 of 36 slots occupied).
+        this.register({
+            id: 27,
+            name: 'clear_junk',
+            description: 'Drop low-value blocks to free inventory space (auto-triggered when nearly full)',
+            preconditions: () => this.bot.inventory.items().length >= 27,
+            execute: async () => {
+                return await this._clearJunk();
             }
         });
     }
@@ -417,19 +591,21 @@ class SkillManager {
     async _explore() {
         const { pathfinder, Movements } = require('mineflayer-pathfinder');
         const mcData = require('minecraft-data')(this.bot.version);
-        
-        // Random direction
+
+        // Random direction, shorter distance to avoid wandering into ocean
         const angle = Math.random() * 2 * Math.PI;
-        const distance = 30 + Math.random() * 50;
-        
+        const distance = 15 + Math.random() * 20;
+
         const targetX = this.bot.entity.position.x + Math.cos(angle) * distance;
         const targetZ = this.bot.entity.position.z + Math.sin(angle) * distance;
-        
+
         const goal = new GoalNear(targetX, this.bot.entity.position.y, targetZ, 5);
-        
+
         try {
-            const defaultMove = new Movements(this.bot, mcData);
-            this.bot.pathfinder.setMovements(defaultMove);
+            const safeMove = new Movements(this.bot, mcData);
+            safeMove.canSwim = false;          // never enter water voluntarily
+            safeMove.allowSprinting = true;
+            this.bot.pathfinder.setMovements(safeMove);
             await this.bot.pathfinder.goto(goal);
             return { success: true, message: `Explored to ${targetX.toFixed(0)}, ${targetZ.toFixed(0)}` };
         } catch (error) {
@@ -437,9 +613,191 @@ class SkillManager {
         }
     }
 
+    async _clearJunk() {
+        // Items worthless to the tech-tree that pile up during descent
+        const junkNames = [
+            'cobblestone', 'gravel', 'dirt', 'sand', 'andesite',
+            'diorite', 'granite', 'tuff', 'calcite', 'deepslate',
+            'cobbled_deepslate', 'stone', 'flint', 'clay_ball',
+            'sandstone', 'netherrack'
+        ];
+
+        let dropped = 0;
+        for (const item of this.bot.inventory.items()) {
+            if (junkNames.some(j => item.name === j || item.name.includes(j))) {
+                try {
+                    await this.bot.toss(item.type, null, item.count);
+                    dropped += item.count;
+                } catch (_) { /* ignore toss errors */ }
+            }
+        }
+
+        if (dropped === 0) {
+            return { success: false, message: 'No junk items to drop' };
+        }
+        return { success: true, message: `Dropped ${dropped} junk items, freed inventory space` };
+    }
+
+    async _digToY(targetY) {
+        const mcData = require('minecraft-data')(this.bot.version);
+
+        const digMove = new Movements(this.bot, mcData);
+        digMove.canDig = true;
+        digMove.canSwim = false;
+        digMove.allowSprinting = false; // slower = safer underground
+        this.bot.pathfinder.setMovements(digMove);
+
+        let lavaAbort = false;
+        const lavaCheckInterval = setInterval(() => {
+            for (let dy = 1; dy <= 5; dy++) {
+                const checkBlock = this.bot.blockAt(this.bot.entity.position.offset(0, -dy, 0));
+                if (checkBlock && checkBlock.name === 'lava') {
+                    lavaAbort = true;
+                    this.bot.pathfinder.stop();
+                    clearInterval(lavaCheckInterval);
+                    break;
+                }
+            }
+        }, 2000);
+
+        const timeoutPromise = new Promise((_, reject) =>
+            setTimeout(() => reject(new Error('_digToY timed out after 3 minutes')), 180000)
+        );
+
+        try {
+            await Promise.race([
+                this.bot.pathfinder.goto(new GoalY(targetY)),
+                timeoutPromise
+            ]);
+            if (lavaAbort) {
+                return { success: false, message: 'Aborted: lava detected below' };
+            }
+            return { success: true, message: `Reached Y=${Math.floor(this.bot.entity.position.y)}` };
+        } catch (error) {
+            if (lavaAbort) {
+                return { success: false, message: 'Aborted: lava detected below' };
+            }
+            return { success: false, message: `Dig to Y failed: ${error.message}` };
+        } finally {
+            clearInterval(lavaCheckInterval);
+            // Always restore safe movement so other skills don't accidentally tunnel
+            const safeMove = new Movements(this.bot, mcData);
+            safeMove.canDig = false;
+            safeMove.canSwim = false;
+            this.bot.pathfinder.setMovements(safeMove);
+        }
+    }
+
+    async _returnToSurface() {
+        const mcData = require('minecraft-data')(this.bot.version);
+
+        const climbMove = new Movements(this.bot, mcData);
+        climbMove.canDig = true;   // may need to re-mine collapsed blocks
+        climbMove.canSwim = false;
+        climbMove.allowSprinting = false;
+        this.bot.pathfinder.setMovements(climbMove);
+
+        const timeoutPromise = new Promise((_, reject) =>
+            setTimeout(() => reject(new Error('_returnToSurface timed out after 3 minutes')), 180000)
+        );
+
+        try {
+            await Promise.race([
+                this.bot.pathfinder.goto(new GoalY(64)),
+                timeoutPromise
+            ]);
+            return { success: true, message: `Surfaced at Y=${Math.floor(this.bot.entity.position.y)}` };
+        } catch (error) {
+            return { success: false, message: `Return to surface failed: ${error.message}` };
+        } finally {
+            const safeMove = new Movements(this.bot, mcData);
+            safeMove.canDig = false;
+            safeMove.canSwim = false;
+            this.bot.pathfinder.setMovements(safeMove);
+        }
+    }
+
     async _smeltItem(inputItem, outputItem) {
-        // Placeholder - requires furnace interaction
-        return { success: false, message: 'Smelting not yet implemented' };
+        // Step 1: Find an existing furnace in the world
+        let furnaceBlock = this.bot.findBlock({
+            matching: b => b.name === 'furnace',
+            maxDistance: 32
+        });
+
+        // Step 2: If no furnace in world, craft one and place it
+        if (!furnaceBlock) {
+            if (!this._hasItem('furnace')) {
+                // Craft from cobblestone
+                const craftResult = await this._craftWithTable('furnace', 1);
+                if (!craftResult.success) {
+                    return { success: false, message: `Could not craft furnace: ${craftResult.message}` };
+                }
+            }
+            // Place furnace next to bot
+            const placeResult = await this._placeBlock('furnace');
+            if (!placeResult.success) {
+                return { success: false, message: `Could not place furnace: ${placeResult.message}` };
+            }
+            await this._wait(300); // let block appear in world
+            furnaceBlock = this.bot.findBlock({
+                matching: b => b.name === 'furnace',
+                maxDistance: 8
+            });
+            if (!furnaceBlock) {
+                return { success: false, message: 'Placed furnace but could not locate it' };
+            }
+        }
+
+        // Step 3: Walk up to the furnace
+        await this._goTo(furnaceBlock.position);
+
+        // Step 4: Pick fuel — prefer coal/charcoal, fall back to planks/logs
+        const fuelItem = this.bot.inventory.items().find(i =>
+            i.name === 'coal' ||
+            i.name === 'charcoal' ||
+            i.name.includes('planks') ||
+            i.name.includes('_log')
+        );
+        if (!fuelItem) {
+            return { success: false, message: 'No fuel available (need coal, planks, or logs)' };
+        }
+
+        // Step 5: Check we still have the input item
+        const inputObj = this.bot.inventory.items().find(i => i.name === inputItem);
+        if (!inputObj) {
+            return { success: false, message: `No ${inputItem} in inventory` };
+        }
+
+        try {
+            const furnace = await this.bot.openFurnace(furnaceBlock);
+
+            // Load fuel and input (smelt up to 8 at once)
+            await furnace.putFuel(fuelItem.type, null, Math.min(fuelItem.count, 8));
+            await furnace.putInput(inputObj.type, null, Math.min(inputObj.count, 8));
+
+            // Wait for at least one output (each item takes ~10 game ticks = ~0.5 s real time)
+            await new Promise((resolve, reject) => {
+                const deadline = setTimeout(() => {
+                    reject(new Error('Smelting timed out after 45 s'));
+                }, 45000);
+
+                const poll = setInterval(() => {
+                    if (furnace.outputItem()) {
+                        clearInterval(poll);
+                        clearTimeout(deadline);
+                        resolve();
+                    }
+                }, 500);
+            });
+
+            // Collect finished ingots
+            await furnace.takeOutput();
+            furnace.close();
+
+            return { success: true, message: `Smelted ${inputItem} → ${outputItem}` };
+        } catch (error) {
+            return { success: false, message: `Smelting failed: ${error.message}` };
+        }
     }
 
     // ==================== Helper Methods ====================
@@ -447,10 +805,11 @@ class SkillManager {
     async _goTo(position) {
         const { pathfinder, Movements, goals } = require('mineflayer-pathfinder');
         const mcData = require('minecraft-data')(this.bot.version);
-        
-        const defaultMove = new Movements(this.bot, mcData);
-        this.bot.pathfinder.setMovements(defaultMove);
-        
+
+        const safeMove = new Movements(this.bot, mcData);
+        safeMove.canSwim = false;   // never route through water
+        this.bot.pathfinder.setMovements(safeMove);
+
         const goal = new goals.GoalNear(position.x, position.y, position.z, 2);
         await this.bot.pathfinder.goto(goal);
     }
@@ -508,17 +867,33 @@ class SkillManager {
         // Reward for gaining new items
         let reward = 0;
         const techTreeValues = {
+            // Wood tier
             'oak_log': 0.1, 'birch_log': 0.1, 'spruce_log': 0.1,
             'oak_planks': 0.05, 'birch_planks': 0.05,
             'stick': 0.02,
             'crafting_table': 0.3,
             'wooden_pickaxe': 0.5,
+            // Stone tier
             'cobblestone': 0.1,
             'stone_pickaxe': 1.0,
+            // Iron tier
+            'coal': 0.1,
             'iron_ore': 0.5,
             'raw_iron': 0.5,
+            'furnace': 0.8,
             'iron_ingot': 1.0,
-            'iron_pickaxe': 2.0
+            'iron_pickaxe': 2.0,
+            'iron_helmet': 3.0,
+            'iron_chestplate': 4.5,
+            'iron_leggings': 4.0,
+            'iron_boots': 2.5,
+            // Diamond tier
+            'diamond': 5.0,
+            'diamond_pickaxe': 10.0,
+            'diamond_helmet': 8.0,
+            'diamond_chestplate': 12.0,
+            'diamond_leggings': 10.0,
+            'diamond_boots': 6.0
         };
         
         for (const [item, count] of Object.entries(after)) {

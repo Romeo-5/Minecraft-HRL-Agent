@@ -68,6 +68,39 @@ bot.once('spawn', () => {
     console.log(`[Bot] Position: ${bot.entity.position}`);
     console.log(`[Bot] Health: ${bot.health}, Food: ${bot.food}`);
 
+    // Safety check: if spawned in water or void, find dry ground within 64 blocks
+    setTimeout(async () => {
+        try {
+            const pos = bot.entity.position;
+            const block = bot.blockAt(pos);
+            const blockBelow = bot.blockAt(pos.offset(0, -1, 0));
+            const inWater = block?.name?.includes('water') || blockBelow?.name?.includes('water');
+            if (inWater || pos.y < 0) {
+                console.log(`[Bot] Unsafe spawn (${block?.name} at y=${pos.y.toFixed(1)}), searching for dry ground...`);
+                // Search for any non-water, non-air solid block nearby to stand on
+                const safeBlock = bot.findBlock({
+                    matching: b => b.name === 'grass_block' || b.name === 'dirt' || b.name === 'sand' || b.name === 'stone',
+                    maxDistance: 64
+                });
+                if (safeBlock) {
+                    const { pathfinder, Movements, goals } = require('mineflayer-pathfinder');
+                    const mcData = require('minecraft-data')(bot.version);
+                    const move = new Movements(bot, mcData);
+                    move.canSwim = false;
+                    bot.pathfinder.setMovements(move);
+                    await bot.pathfinder.goto(new goals.GoalNear(safeBlock.position.x, safeBlock.position.y, safeBlock.position.z, 2));
+                    console.log(`[Bot] Moved to safe ground at ${bot.entity.position}`);
+                } else {
+                    console.log('[Bot] Could not find safe ground nearby — bot may be stuck in water');
+                }
+            } else {
+                console.log(`[Bot] Spawn looks safe: ${block?.name} at y=${pos.y.toFixed(1)}`);
+            }
+        } catch (err) {
+            console.error('[Bot] Safe-spawn check failed:', err.message);
+        }
+    }, 3000); // Wait 3s for chunks to load before checking
+
     // Initialize skill manager
     skillManager = new SkillManager(bot);
     console.log(`[Bot] Skill Manager initialized with ${skillManager.getActionSpaceSize()} skills`);

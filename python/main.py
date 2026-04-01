@@ -138,8 +138,11 @@ def train(args):
     )
     
     # Connect to Mineflayer bot
+    # Call connect() on the outermost wrapper so FlatMinecraftEnv can recompute
+    # its flattened observation space after learning the real skill count.
     print("[Main] Connecting to Mineflayer bot...")
-    if not env.unwrapped.connect(timeout=30):
+    connector = getattr(env, 'connect', None) or getattr(env.unwrapped, 'connect')
+    if not connector(timeout=30):
         print("[Main] ERROR: Could not connect to Mineflayer bot!")
         print("[Main] Make sure the bot is running: cd mineflayer && npm start")
         sys.exit(1)
@@ -216,7 +219,8 @@ def evaluate(args):
         render_mode="human"
     )
     
-    if not env.unwrapped.connect(timeout=30):
+    connector = getattr(env, 'connect', None) or getattr(env.unwrapped, 'connect')
+    if not connector(timeout=30):
         print("[Main] ERROR: Could not connect to Mineflayer bot!")
         sys.exit(1)
     

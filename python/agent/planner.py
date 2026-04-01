@@ -158,19 +158,34 @@ class SkillGraphPlanner:
         # Skill dependencies: skill_id -> list of (prerequisite_skill, required_item)
         # This encodes the Minecraft tech tree
         self.dependencies = {
-            0: [],  # idle - no deps
-            1: [],  # harvest_wood - no deps
-            2: [(6, 'wooden_pickaxe')],  # mine_stone - need pickaxe
-            3: [(1, '_log')],  # craft_planks - need logs
-            4: [(3, '_planks')],  # craft_sticks - need planks
-            5: [(3, '_planks')],  # craft_crafting_table - need planks
-            6: [(4, 'stick'), (5, 'crafting_table')],  # craft_wooden_pickaxe
-            7: [(2, 'cobblestone'), (4, 'stick')],  # craft_stone_pickaxe
-            8: [],  # eat_food - no deps (assumes food exists)
-            9: [],  # explore - no deps
-            10: [(5, 'crafting_table')],  # place_crafting_table
-            11: [(7, 'stone_pickaxe')],  # mine_iron
-            12: [(11, 'raw_iron')],  # smelt_iron
+            0:  [],                                          # idle
+            1:  [],                                          # harvest_wood
+            2:  [(6,  'wooden_pickaxe')],                   # mine_stone
+            3:  [(1,  '_log')],                             # craft_planks
+            4:  [(3,  '_planks')],                          # craft_sticks
+            5:  [(3,  '_planks')],                          # craft_crafting_table
+            6:  [(4,  'stick'), (5,  'crafting_table')],    # craft_wooden_pickaxe
+            7:  [(2,  'cobblestone'), (4, 'stick')],        # craft_stone_pickaxe
+            8:  [],                                          # eat_food
+            9:  [],                                          # explore
+            10: [(5,  'crafting_table')],                   # place_crafting_table
+            11: [(7,  'stone_pickaxe')],                    # mine_iron
+            12: [(11, 'raw_iron')],                         # smelt_iron
+            13: [(2,  'cobblestone')],                      # craft_furnace
+            14: [(12, 'iron_ingot'), (4, 'stick')],         # craft_iron_pickaxe
+            15: [(12, 'iron_ingot')],                       # craft_iron_helmet
+            16: [(12, 'iron_ingot')],                       # craft_iron_chestplate
+            17: [(12, 'iron_ingot')],                       # craft_iron_leggings
+            18: [(12, 'iron_ingot')],                       # craft_iron_boots
+            19: [(14, 'iron_pickaxe')],                     # dig_to_diamond_level
+            20: [],                                          # return_to_surface (positional)
+            21: [(19, 'iron_pickaxe')],                     # mine_diamond
+            22: [(21, 'diamond'), (4, 'stick')],            # craft_diamond_pickaxe
+            23: [(21, 'diamond')],                          # craft_diamond_helmet
+            24: [(21, 'diamond')],                          # craft_diamond_chestplate
+            25: [(21, 'diamond')],                          # craft_diamond_leggings
+            26: [(21, 'diamond')],                          # craft_diamond_boots
+            27: [],                                          # clear_junk (always available)
         }
         
         # Build reverse graph (what does each skill unlock?)
@@ -253,14 +268,66 @@ class SkillGraphPlanner:
         return scores[0][0]
 
 
+class StepLoggerCallback(BaseCallback):
+    """
+    Logs detailed per-step metrics to TensorBoard every N steps.
+
+    SB3's built-in logger only dumps episode-level stats (ep_rew_mean, etc.)
+    at the end of each episode. This callback forces a TensorBoard write every
+    `log_every` steps so training progress is visible in near-real-time.
+
+    Logged metrics:
+      custom/step_reward       – raw reward for this step
+      custom/skill_success     – 1.0 if skill succeeded, 0.0 if not
+      custom/inventory_count   – number of distinct item types held
+      custom/rolling_reward    – mean reward over the last log_every steps
+      custom/rolling_success   – mean skill success over the last log_every steps
+      custom/context_bonus     – context reward shaper bonus (if available)
+    """
+
+    def __init__(self, log_every: int = 100, verbose: int = 0):
+        super().__init__(verbose)
+        self.log_every = log_every
+        self._reward_buf: List[float] = []
+        self._success_buf: List[float] = []
+
+    def _on_step(self) -> bool:
+        rewards = self.locals.get('rewards', [0.0])
+        infos  = self.locals.get('infos',   [{}])
+
+        reward = float(rewards[0]) if len(rewards) > 0 else 0.0
+        info   = infos[0] if infos else {}
+
+        success = float(info.get('skill_success', False))
+        self._reward_buf.append(reward)
+        self._success_buf.append(success)
+
+        if self.num_timesteps % self.log_every == 0:
+            self.logger.record('custom/step_reward',    reward)
+            self.logger.record('custom/skill_success',  success)
+            self.logger.record('custom/inventory_count', info.get('inventory_count', 0))
+            self.logger.record('custom/rolling_reward',
+                               float(np.mean(self._reward_buf)) if self._reward_buf else 0.0)
+            self.logger.record('custom/rolling_success',
+                               float(np.mean(self._success_buf)) if self._success_buf else 0.0)
+            if 'context_bonus' in info:
+                self.logger.record('custom/context_bonus', float(info['context_bonus']))
+            self.logger.dump(self.num_timesteps)
+            # Keep only recent window to avoid memory growth
+            self._reward_buf  = self._reward_buf[-self.log_every:]
+            self._success_buf = self._success_buf[-self.log_every:]
+
+        return True
+
+
 class NoveltyExplorationCallback(BaseCallback):
     """
     Callback for injecting novelty bonuses into training.
-    
+
     Modifies rewards during training to include intrinsic
     motivation based on action novelty.
     """
-    
+
     def __init__(
         self,
         novelty_tracker: ActionNoveltyTracker,
@@ -270,21 +337,21 @@ class NoveltyExplorationCallback(BaseCallback):
         super().__init__(verbose)
         self.novelty_tracker = novelty_tracker
         self.novelty_weight = novelty_weight
-    
+
     def _on_step(self) -> bool:
         # Get info from the latest step
         infos = self.locals.get('infos', [])
         actions = self.locals.get('actions', [])
-        
+
         for i, (info, action) in enumerate(zip(infos, actions)):
             if info:
                 skill_id = int(action)
                 success = info.get('skill_success', True)
-                
+
                 # Create state hash from raw state
                 raw_state = info.get('raw_state', {})
                 state_hash = self._hash_state(raw_state)
-                
+
                 # Update tracker
                 self.novelty_tracker.update(
                     skill_id=skill_id,
@@ -293,9 +360,9 @@ class NoveltyExplorationCallback(BaseCallback):
                     next_state_hash=state_hash
                 )
                 self._prev_hash = state_hash
-        
+
         return True
-    
+
     def _hash_state(self, state: dict) -> str:
         """Create a hashable representation of state."""
         # Focus on inventory for state abstraction
@@ -418,26 +485,32 @@ class HRLAgent:
     def train(
         self,
         total_timesteps: int,
-        callback: Optional[BaseCallback] = None
+        callback: Optional[BaseCallback] = None,
+        log_every: int = 100
     ):
         """Train the agent."""
-        # Create novelty callback
+        from stable_baselines3.common.callbacks import CallbackList
+
+        # Step-level TensorBoard logger (every `log_every` steps)
+        step_logger = StepLoggerCallback(log_every=log_every)
+
+        # Novelty exploration callback
         novelty_callback = NoveltyExplorationCallback(
             self.novelty_tracker,
             novelty_weight=self.novelty_weight
         )
-        
-        # Combine callbacks
+
+        # Combine all callbacks
+        all_cbs = [step_logger, novelty_callback]
         if callback:
-            from stable_baselines3.common.callbacks import CallbackList
-            callbacks = CallbackList([novelty_callback, callback])
-        else:
-            callbacks = novelty_callback
-        
-        # Train
+            all_cbs.append(callback)
+        callbacks = CallbackList(all_cbs)
+
+        # Train — log_interval=1 makes SB3 dump episode stats after every episode
         self.policy.learn(
             total_timesteps=total_timesteps,
             callback=callbacks,
+            log_interval=1,
             progress_bar=True
         )
     
