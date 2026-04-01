@@ -54,4 +54,4 @@ sb3_logs/
 data/benchmark_results/raw_responses
 
 # Minecraft server
-minecraft-server/
+# minecraft-server/
