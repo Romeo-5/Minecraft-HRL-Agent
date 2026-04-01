@@ -61,8 +61,9 @@ const bot = mineflayer.createBot({
 let skillManager = null;
 let bridge = null;
 
-// Bot event handlers
-bot.on('spawn', () => {
+// Bot event handlers — use once() so bridge/viewer only start on first spawn
+// (avoids EADDRINUSE crash if the bot dies and respawns during a training run)
+bot.once('spawn', () => {
     console.log('[Bot] Spawned in world!');
     console.log(`[Bot] Position: ${bot.entity.position}`);
     console.log(`[Bot] Health: ${bot.health}, Food: ${bot.food}`);
@@ -96,7 +97,10 @@ bot.on('health', () => {
 });
 
 bot.on('death', () => {
-    console.log('[Bot] Died! Waiting for respawn...');
+    console.log('[Bot] Died! Auto-respawning...');
+    setTimeout(() => {
+        bot.respawn();
+    }, 1000);
 });
 
 bot.on('kicked', (reason) => {
@@ -122,6 +126,9 @@ bot.once('inject_allowed', () => {
     bot.loadPlugin(toolPlugin);
     bot.loadPlugin(collectBlock);
     console.log('[Bot] Plugins loaded: pathfinder, tool, collectBlock');
+    // Give pathfinder more time to compute paths (default ~5s is too short for
+    // large search radii like the 64-block harvest_wood scan)
+    bot.pathfinder.thinkTimeout = 15000;
 });
 
 // Chat commands for debugging (can be sent from Minecraft)

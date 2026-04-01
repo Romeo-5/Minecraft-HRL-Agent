@@ -25,6 +25,18 @@ import websockets
 from typing import Dict, Any, Tuple, Optional
 import time
 import threading
+import sys
+import os
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "..", "data"))
+from reward.context_reward import ContextRewardShaper
+try:
+    from config import BIOMES, STRUCTURES
+    _BIOME_IDX  = {b: i for i, b in enumerate(BIOMES)}
+    _STRUCT_IDX = {s: i for i, s in enumerate(STRUCTURES)}
+except ImportError:
+    BIOMES, STRUCTURES = [], []
+    _BIOME_IDX, _STRUCT_IDX = {}, {}
 
 
 class MinecraftHRLEnv(gym.Env):
@@ -78,14 +90,18 @@ class MinecraftHRLEnv(gym.Env):
         host: str = "localhost",
         port: int = 8765,
         render_mode: Optional[str] = None,
-        max_episode_steps: int = 1000
+        max_episode_steps: int = 1000,
+        env_aware: bool = False,
+        context_reward: bool = True,
     ):
         super().__init__()
-        
+
         self.host = host
         self.port = port
         self.render_mode = render_mode
         self.max_episode_steps = max_episode_steps
+        self.env_aware = env_aware          # include biome/structure in observation
+        self.context_reward = context_reward  # enable context-sensitive reward bonus
         
         # WebSocket connection
         self.ws = None
@@ -100,7 +116,10 @@ class MinecraftHRLEnv(gym.Env):
         # Will be set after connecting to get actual skill count
         self._num_skills = 13  # Default, updated on connect
         self._skill_info = []
-        
+
+        # Context-sensitive reward shaper (only instantiated when enabled)
+        self.context_shaper = ContextRewardShaper() if context_reward else None
+
         # Define spaces (will be updated after connection)
         self._define_spaces()
         
@@ -139,10 +158,19 @@ class MinecraftHRLEnv(gym.Env):
             
             # Time of day (normalized)
             'time_of_day': spaces.Box(low=0, high=1, shape=(1,), dtype=np.float32),
-            
+
             # Is daytime
             'is_day': spaces.MultiBinary(1)
         })
+
+        # env-aware mode: extend observation with biome + structure context
+        if self.env_aware and BIOMES:
+            self.observation_space.spaces['biome_vec'] = spaces.Box(
+                low=0, high=1, shape=(len(BIOMES),), dtype=np.float32
+            )
+            self.observation_space.spaces['structure_vec'] = spaces.Box(
+                low=0, high=1, shape=(len(STRUCTURES),), dtype=np.float32
+            )
         
         # Action space: discrete skill selection
         self.action_space = spaces.Discrete(self._num_skills)
@@ -251,7 +279,22 @@ class MinecraftHRLEnv(gym.Env):
         time_of_day = state.get('time_of_day', 0)
         obs['time_of_day'] = np.array([time_of_day / 24000.0], dtype=np.float32)
         obs['is_day'] = np.array([1 if state.get('is_day', True) else 0], dtype=np.int8)
-        
+
+        # env-aware mode: add biome one-hot and structure multi-hot
+        if self.env_aware and BIOMES:
+            biome_vec = np.zeros(len(BIOMES), dtype=np.float32)
+            biome_idx = _BIOME_IDX.get(state.get("biome", ""), -1)
+            if biome_idx >= 0:
+                biome_vec[biome_idx] = 1.0
+            obs['biome_vec'] = biome_vec
+
+            structure_vec = np.zeros(len(STRUCTURES), dtype=np.float32)
+            for struct in state.get("nearby_structures", []):
+                sidx = _STRUCT_IDX.get(struct, -1)
+                if sidx >= 0:
+                    structure_vec[sidx] = 1.0
+            obs['structure_vec'] = structure_vec
+
         return obs
     
     def reset(
@@ -272,7 +315,9 @@ class MinecraftHRLEnv(gym.Env):
                 raise RuntimeError("Failed to connect to Mineflayer bot")
         
         self._step_count = 0
-        
+        if self.context_shaper is not None:
+            self.context_shaper.reset()
+
         # Send reset command
         response = self._send_and_receive({'type': 'reset'})
         
@@ -317,14 +362,29 @@ class MinecraftHRLEnv(gym.Env):
         
         self._current_state = response['state']
         obs = self._encode_observation(self._current_state)
-        
-        reward = response['reward']
+
+        # Base reward from tech tree (via Mineflayer bot)
+        base_reward = response['reward']
+
+        # Context-sensitive bonus: rewards structure shortcuts and biome-adaptive play
+        context_bonus = 0.0
+        if self.context_shaper is not None:
+            skill_name = self.get_skill_name(action)
+            context_obs = {
+                "biome": self._current_state.get("biome", ""),
+                "nearby_structures": self._current_state.get("nearby_structures", []),
+            }
+            context_bonus = self.context_shaper.get_bonus(context_obs, skill_name)
+        reward = base_reward + context_bonus
+
         terminated = response['done']
         truncated = response.get('truncated', self._step_count >= self.max_episode_steps)
-        
+
         info = response.get('info', {})
         info['raw_state'] = self._current_state
-        
+        info['base_reward'] = base_reward
+        info['context_bonus'] = context_bonus
+
         return obs, reward, terminated, truncated, info
     
     def render(self):

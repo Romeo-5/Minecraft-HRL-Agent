@@ -2491,6 +2491,7 @@
     "health": 12,
     "reasoning_path": [
       "craft_iron_pickaxe",
+      "mine_coal",
       "craft_torch",
       "search_for_animals",
       "eat_food",
@@ -2675,9 +2676,9 @@
     "time_of_day": "dusk",
     "health": 8,
     "reasoning_path": [
-      "mine_stone",
       "craft_crafting_table",
-      "craft_furnace"
+      "craft_furnace",
+      "mine_stone"
     ],
     "reasoning_text": "Already have 5 oak logs in inventory, so wood harvesting is unnecessary. At Y=-7 near a stronghold, stone is abundant. Craft a crafting table first, then mine 8 cobblestone to craft the furnace. Health is low at 8 but no immediate threat underground requires food priority over crafting. Time of day is irrelevant underground.",
     "context_matters": true,
@@ -2777,6 +2778,7 @@
     "reasoning_path": [
       "smelt_iron",
       "craft_iron_pickaxe",
+      "mine_coal",
       "craft_torch",
       "place_torches",
       "explore_cave"
@@ -2897,13 +2899,13 @@
     "time_of_day": "night",
     "health": 20,
     "reasoning_path": [
-      "return_to_surface",
       "harvest_wood",
       "craft_planks_and_sticks",
       "craft_crafting_table",
       "craft_wooden_pickaxe",
+      "craft_stone_pickaxe",
       "mine_iron_ore",
-      "craft_stone_pickaxe"
+      "return_to_surface"
     ],
     "reasoning_text": "At Y=-30 underground near a stronghold with an empty inventory, the priority is to return to the surface first. Underground at this depth, there is no wood available to craft anything. Once on the surface, harvest wood, craft a crafting table and wooden pickaxe, then mine stone to craft a stone pickaxe. The stronghold is irrelevant to the current task of obtaining a stone pickaxe.",
     "context_matters": true,
@@ -2981,6 +2983,7 @@
     "reasoning_path": [
       "smelt_iron",
       "craft_iron_pickaxe",
+      "mine_coal",
       "craft_torch",
       "explore_cave"
     ],
@@ -3183,14 +3186,14 @@
     "time_of_day": "night",
     "health": 20,
     "reasoning_path": [
-      "return_to_surface",
       "harvest_wood",
-      "mine_stone",
       "craft_planks_and_sticks",
       "craft_crafting_table",
       "craft_furnace",
+      "mine_stone",
       "mine_iron_ore",
-      "smelt_iron"
+      "smelt_iron",
+      "return_to_surface"
     ],
     "reasoning_text": "Currently underground at y=21 in a desert biome with an empty inventory. The nether_fortress is irrelevant to smelting iron. First, return to surface to gather resources safely (it's night, but desert has limited tree cover so speed matters). Harvest any available wood at biome edge, then stone. Craft a crafting table and furnace. Mine iron ore (already at a good y_level for iron, but need tools first - stone pickaxe for efficient iron mining). Then smelt the iron ore in the furnace using wood/planks as fuel.",
     "context_matters": true,
@@ -3392,6 +3395,7 @@
       "craft_iron_pickaxe",
       "mine_stone",
       "build_walls_and_roof",
+      "mine_coal",
       "craft_torch",
       "place_torches"
     ],
@@ -3467,6 +3471,7 @@
       "craft_planks_and_sticks",
       "craft_crafting_table",
       "craft_wooden_pickaxe",
+      "mine_coal",
       "craft_torch",
       "place_torches",
       "explore_cave"
@@ -3524,6 +3529,7 @@
       "smelt_iron",
       "craft_iron_pickaxe",
       "craft_iron_armor_set",
+      "mine_coal",
       "craft_torch",
       "place_torches",
       "explore_cave"
@@ -3631,6 +3637,7 @@
       "craft_crafting_table",
       "craft_wooden_pickaxe",
       "craft_stone_pickaxe",
+      "mine_coal",
       "craft_torch",
       "explore_cave"
     ],
@@ -3885,6 +3892,7 @@
       "craft_planks_and_sticks",
       "craft_crafting_table",
       "craft_wooden_pickaxe",
+      "mine_coal",
       "craft_torch",
       "explore_cave",
       "explore_cave"
@@ -4036,6 +4044,7 @@
     "health": 20,
     "reasoning_path": [
       "craft_stone_pickaxe",
+      "mine_coal",
       "craft_torch",
       "explore_cave",
       "mine_iron_ore",
@@ -4063,6 +4072,7 @@
     "reasoning_path": [
       "craft_iron_pickaxe",
       "craft_iron_armor_set",
+      "mine_coal",
       "craft_torch",
       "explore_cave",
       "explore_cave"
@@ -4121,6 +4131,7 @@
       "eat_food",
       "craft_planks_and_sticks",
       "craft_crafting_table",
+      "mine_coal",
       "craft_torch",
       "place_torches",
       "explore_cave"
@@ -4197,10 +4208,10 @@
     "time_of_day": "dawn",
     "health": 12,
     "reasoning_path": [
-      "mine_stone",
       "craft_planks_and_sticks",
       "craft_crafting_table",
-      "craft_furnace"
+      "craft_furnace",
+      "mine_stone"
     ],
     "reasoning_text": "Player is underground at Y=-3 with 5 oak logs and needs to craft a furnace. Furnace requires 8 cobblestone arranged in a ring on a crafting table. Player already has wood for a crafting table and sticks. Priority is to mine cobblestone (plentiful underground), then craft planks/sticks, craft a crafting table, and finally craft the furnace. Health is low at 12 but dawn means surface is relatively safe if needed; however, stone is immediately available underground so no need to surface. Village is nearby but irrelevant for this crafting task.",
     "context_matters": true,
@@ -4350,10 +4361,10 @@
     "time_of_day": "day",
     "health": 20,
     "reasoning_path": [
-      "mine_stone",
       "craft_planks_and_sticks",
       "craft_crafting_table",
-      "craft_stone_pickaxe"
+      "craft_stone_pickaxe",
+      "mine_stone"
     ],
     "reasoning_text": "Already underground at Y=-36 with a wooden pickaxe and 3 oak logs in inventory. Mine stone directly with the wooden pickaxe, then use the oak logs to craft planks, sticks, and a crafting table to assemble the stone pickaxe. The nearby nether fortress is irrelevant to this immediate task. No need to navigate anywhere \u2014 stone is abundant at current location.",
     "context_matters": true,
@@ -4433,6 +4444,7 @@
       "harvest_wood",
       "craft_planks_and_sticks",
       "craft_crafting_table",
+      "mine_coal",
       "craft_torch",
       "explore_cave"
     ],
@@ -4661,6 +4673,7 @@
     "health": 20,
     "reasoning_path": [
       "craft_iron_pickaxe",
+      "mine_coal",
       "craft_torch",
       "explore_cave",
       "explore_cave"
@@ -4686,6 +4699,7 @@
     "health": 12,
     "reasoning_path": [
       "craft_stone_pickaxe",
+      "mine_coal",
       "craft_torch",
       "place_torches",
       "explore_cave",
@@ -4740,6 +4754,7 @@
       "eat_food",
       "craft_planks_and_sticks",
       "craft_crafting_table",
+      "mine_coal",
       "craft_torch",
       "explore_cave",
       "explore_cave",
@@ -4843,6 +4858,7 @@
       "craft_planks_and_sticks",
       "craft_crafting_table",
       "craft_wooden_pickaxe",
+      "mine_coal",
       "craft_torch",
       "search_for_animals",
       "eat_food",
@@ -4894,6 +4910,7 @@
     "reasoning_path": [
       "craft_planks_and_sticks",
       "craft_crafting_table",
+      "mine_coal",
       "craft_torch",
       "search_for_animals",
       "eat_food",
@@ -5216,9 +5233,9 @@
     "time_of_day": "dawn",
     "health": 12,
     "reasoning_path": [
-      "mine_stone",
       "craft_crafting_table",
-      "craft_furnace"
+      "craft_furnace",
+      "mine_stone"
     ],
     "reasoning_text": "At Y-level 7 underground, stone is abundantly available. The inventory already has oak logs and a wooden pickaxe, so wood harvesting can be skipped. Mine 8 cobblestone with the wooden pickaxe, craft a crafting table from existing logs, then craft the furnace. The nearby village and dungeon are irrelevant to crafting a furnace, and health at 12 is not critically low enough to require immediate food action.",
     "context_matters": false,
@@ -5344,6 +5361,7 @@
     "time_of_day": "day",
     "health": 12,
     "reasoning_path": [
+      "mine_coal",
       "craft_torch",
       "craft_iron_pickaxe",
       "place_torches",
@@ -5918,6 +5936,7 @@
     "reasoning_path": [
       "craft_planks_and_sticks",
       "craft_crafting_table",
+      "mine_coal",
       "craft_torch",
       "place_torches",
       "explore_cave",
@@ -6277,11 +6296,11 @@
     "time_of_day": "night",
     "health": 12,
     "reasoning_path": [
-      "mine_stone",
       "craft_planks_and_sticks",
       "craft_crafting_table",
       "craft_wooden_pickaxe",
-      "craft_stone_pickaxe"
+      "craft_stone_pickaxe",
+      "mine_stone"
     ],
     "reasoning_text": "Underground at Y=0 near a stronghold with no inventory, low health, and nighttime (irrelevant underground). Priority is getting a stone pickaxe as quickly as possible. Stone is abundant underground, so mine it first. Then craft planks and sticks (need wood first - but no wood in inventory, so must find wood or use stronghold wooden planks). Actually, must harvest wood first or find wooden materials in stronghold. Craft crafting table, then wooden pickaxe, then stone pickaxe. Health is low at 12 so avoid combat with stronghold mobs.",
     "context_matters": true,
@@ -6759,6 +6778,7 @@
       "craft_crafting_table",
       "craft_wooden_pickaxe",
       "craft_stone_pickaxe",
+      "mine_coal",
       "craft_torch",
       "explore_cave",
       "explore_cave"
@@ -6934,10 +6954,10 @@
     "time_of_day": "dawn",
     "health": 12,
     "reasoning_path": [
-      "explore_cave",
-      "mine_stone",
       "craft_crafting_table",
       "craft_furnace",
+      "mine_stone",
+      "explore_cave",
       "build_walls_and_roof",
       "place_torches"
     ],
@@ -7211,6 +7231,7 @@
       "place_torches",
       "build_walls_and_roof",
       "craft_furnace",
+      "mine_coal",
       "craft_torch"
     ],
     "reasoning_text": "At y_level -46 underground near a nether fortress, time of day is irrelevant for hostile mob spawning since underground areas spawn mobs regardless. However, the player is at full health and has cobblestone and a crafting table already available. Priority is immediate safety: place any available torches to reduce mob spawning, then build a sealed cobblestone shelter using the 16 cobblestone available. A furnace can be crafted from 8 cobblestone to enable smelting and additional torch crafting. The nether fortress nearby poses a significant threat from blazes and wither skeletons potentially pathing through caves, making a sealed shelter critical.",
@@ -7799,12 +7820,12 @@
     "time_of_day": "day",
     "health": 16,
     "reasoning_path": [
-      "explore_cave",
-      "mine_iron_ore",
-      "return_to_surface",
       "craft_crafting_table",
       "craft_furnace",
-      "smelt_iron"
+      "mine_iron_ore",
+      "smelt_iron",
+      "explore_cave",
+      "return_to_surface"
     ],
     "reasoning_text": "At Y=-5 underground with a wooden pickaxe already in inventory, the player is well-positioned to mine iron ore directly in the cave. With 3 oak logs available, a crafting table and furnace can be crafted once iron ore is collected. After mining sufficient iron ore, return to surface (or craft furnace underground), then smelt the iron. The village nearby could provide a furnace or crafting table, but the resources on hand make self-sufficiency faster. Health at 16/20 is acceptable for cave exploration.",
     "context_matters": true,
@@ -7939,6 +7960,7 @@
       "craft_crafting_table",
       "mine_stone",
       "craft_stone_pickaxe",
+      "mine_coal",
       "craft_torch",
       "search_for_animals",
       "eat_food",
@@ -8525,6 +8547,7 @@
       "craft_wooden_pickaxe",
       "mine_stone",
       "craft_stone_pickaxe",
+      "mine_coal",
       "craft_torch",
       "explore_cave"
     ],
@@ -9203,11 +9226,11 @@
     "time_of_day": "dawn",
     "health": 8,
     "reasoning_path": [
-      "search_for_animals",
-      "eat_food",
-      "mine_stone",
       "craft_crafting_table",
       "craft_furnace",
+      "mine_stone",
+      "search_for_animals",
+      "eat_food",
       "build_walls_and_roof",
       "place_torches"
     ],
@@ -10544,12 +10567,12 @@
     "time_of_day": "dawn",
     "health": 20,
     "reasoning_path": [
-      "mine_stone",
-      "mine_diamonds",
-      "return_to_surface",
       "craft_crafting_table",
       "craft_planks_and_sticks",
-      "craft_iron_pickaxe"
+      "mine_stone",
+      "craft_iron_pickaxe",
+      "mine_diamonds",
+      "return_to_surface"
     ],
     "reasoning_text": "At Y=-59 in deepslate territory, diamonds spawn at Y=-58 to Y=-64 (peak at Y=-59). Already have 5 oak logs for crafting. Mine deepslate iron first if needed, then search for diamonds at this optimal level. Return to surface with materials, craft a crafting table from existing logs, make planks/sticks, then craft the iron pickaxe as prerequisite before diamond pickaxe. Note: need iron pickaxe to mine diamonds, so iron must be obtained first if not in inventory.",
     "context_matters": true,
@@ -11053,9 +11076,9 @@
     "time_of_day": "dusk",
     "health": 20,
     "reasoning_path": [
-      "mine_stone",
       "craft_crafting_table",
       "craft_stone_pickaxe",
+      "mine_stone",
       "build_walls_and_roof",
       "place_torches"
     ],
@@ -11296,14 +11319,14 @@
     "time_of_day": "night",
     "health": 16,
     "reasoning_path": [
-      "explore_cave",
       "mine_iron_ore",
-      "explore_cave",
-      "mine_diamonds",
-      "mine_diamonds",
       "craft_furnace",
+      "craft_iron_pickaxe",
       "smelt_iron",
-      "craft_iron_pickaxe"
+      "mine_diamonds",
+      "mine_diamonds",
+      "explore_cave",
+      "explore_cave"
     ],
     "reasoning_text": "At Y=-51 in a mineshaft, diamonds spawn optimally around Y=-58 to Y=-64. The player already has a wooden pickaxe and some logs. First explore the mineshaft cave system since mineshafts often expose ore veins and provide navigation to lower depths. Mine iron ore encountered along the way, smelt it to craft an iron pickaxe (required to mine diamonds), then search for and mine the diamond vein. Health at 16/20 is acceptable but should be monitored. Night time is irrelevant underground.",
     "context_matters": true,
@@ -11923,15 +11946,15 @@
     "time_of_day": "dawn",
     "health": 8,
     "reasoning_path": [
+      "craft_planks_and_sticks",
+      "craft_crafting_table",
+      "craft_iron_pickaxe",
+      "mine_diamonds",
       "search_for_animals",
       "eat_food",
       "search_for_animals",
       "cook_meat",
-      "craft_iron_pickaxe",
-      "explore_cave",
-      "mine_diamonds",
-      "craft_planks_and_sticks",
-      "craft_crafting_table"
+      "explore_cave"
     ],
     "reasoning_text": "Health is critically low at 8/20, so eating food is the immediate priority. Mushroom island has mooshrooms which can be milked for mushroom stew (infinite food source), making food readily available. With 6 iron ingots and a crafting table already in inventory, craft an iron pickaxe immediately (needs sticks first). Then navigate underground to diamond level (Y=-59) to mine diamonds. Finally craft the diamond pickaxe. Note: a crafting table is already in inventory so no need to craft another.",
     "context_matters": true,
@@ -13367,10 +13390,10 @@
     "reasoning_path": [
       "craft_planks_and_sticks",
       "craft_crafting_table",
+      "craft_iron_pickaxe",
       "craft_wooden_pickaxe",
-      "craft_stone_pickaxe",
       "mine_diamonds",
-      "craft_iron_pickaxe"
+      "craft_stone_pickaxe"
     ],
     "reasoning_text": "At Y=-50 in a desert biome, we are near the optimal diamond level (Y=-58 peak in 1.18+), so diamonds are accessible with minimal further descent. Inventory already has 10 oak logs and 8 cobblestone, so we can immediately craft planks/sticks, a crafting table, wooden pickaxe, then a stone pickaxe (8 cobblestone is enough) to mine iron and diamonds. The pillager outpost nearby is a serious threat especially at dusk with only 12 health, so we should avoid navigating toward it. We skip shelter-building since we are underground. We craft an iron pickaxe using smelted iron before diamond mining, but since smelt_iron requires a furnace and we are already underground near diamonds, we prioritize getting the stone pickaxe to mine iron ore, smelt it, then craft the iron pickaxe needed to mine diamonds.",
     "context_matters": true,
@@ -13837,11 +13860,11 @@
     "health": 20,
     "reasoning_path": [
       "mine_stone",
-      "mine_diamonds",
-      "mine_diamonds",
       "craft_furnace",
-      "smelt_iron",
       "craft_iron_pickaxe",
+      "smelt_iron",
+      "mine_diamonds",
+      "mine_diamonds",
       "mine_diamonds"
     ],
     "reasoning_text": "At Y=-49 in deepslate territory, diamonds generate between Y=-58 and Y=-64 (peak at Y=-59 in 1.18+). With 16 cobblestone and a crafting table already in inventory, craft a furnace immediately. However, we lack iron pickaxe to mine diamonds \u2014 need to smelt iron first. Mine deepslate to gather iron ore at this depth, smelt it using the furnace crafted from existing cobblestone, craft iron pickaxe, then descend slightly to Y=-58 to -64 to search for and mine diamond veins.",
@@ -14948,12 +14971,12 @@
     "reasoning_path": [
       "craft_planks_and_sticks",
       "craft_crafting_table",
-      "craft_wooden_pickaxe",
-      "explore_cave",
-      "mine_iron_ore",
-      "craft_stone_pickaxe",
       "smelt_iron",
-      "craft_iron_pickaxe"
+      "craft_wooden_pickaxe",
+      "craft_iron_pickaxe",
+      "craft_stone_pickaxe",
+      "mine_iron_ore",
+      "explore_cave"
     ],
     "reasoning_text": "Already at y_level 7 in dripstone caves near a mineshaft with oak logs in inventory. Skip wood harvesting entirely. Craft planks/sticks and a crafting table first, then a wooden pickaxe. At y_level 7, iron and even deeper ores are abundant in dripstone caves and the mineshaft. Explore the cave/mineshaft to find iron ore efficiently, mine it, then craft a stone pickaxe as an intermediate step to speed up iron mining. Smelt the iron ore (need to craft a furnace from stone) and craft the iron pickaxe. Health at 16/20 is manageable but monitor during cave exploration. Time being dusk means surface mobs will spawn, making staying underground preferable.",
     "context_matters": true,
@@ -15132,6 +15155,7 @@
       "eat_food",
       "craft_planks_and_sticks",
       "craft_crafting_table",
+      "mine_coal",
       "craft_torch",
       "place_torches",
       "search_for_animals"
@@ -15264,13 +15288,13 @@
     "time_of_day": "dusk",
     "health": 16,
     "reasoning_path": [
+      "craft_iron_pickaxe",
+      "mine_diamonds",
+      "mine_diamonds",
       "eat_food",
       "build_walls_and_roof",
       "explore_cave",
-      "explore_cave",
-      "mine_diamonds",
-      "mine_diamonds",
-      "craft_iron_pickaxe"
+      "explore_cave"
     ],
     "reasoning_text": "Health at 16/20 and dusk approaching means immediate priorities are eating and shelter. Bread in inventory satisfies food need. Build a quick shelter to survive the night safely. Stone pickaxe is already available, skipping early tool crafting. Next morning, navigate underground to diamond level (Y=-58 optimal in 1.18+). Explore caves with torches already in hand. Search for and mine diamond vein, then craft toward diamond pickaxe. Note: iron pickaxe is needed before mining diamonds, but stone pickaxe cannot mine iron fast enough - check if iron ore is encountered during cave exploration first.",
     "context_matters": true,
@@ -15497,9 +15521,9 @@
     "time_of_day": "day",
     "health": 16,
     "reasoning_path": [
-      "mine_stone",
       "craft_crafting_table",
       "craft_planks_and_sticks",
+      "mine_stone",
       "build_walls_and_roof"
     ],
     "reasoning_text": "Already at y_level 10 underground during daytime with 3 oak logs and a wooden pickaxe. Stone is plentiful at this depth, making it the ideal shelter material in a desert where trees are scarce. Craft a crafting table from existing logs, prepare sticks and planks for any needed tools, then use harvested stone to build a shelter. Health at 16/20 is acceptable \u2014 no immediate need to eat. Time of day is day, so there's some window before nightfall but shelter should still be prioritized.",

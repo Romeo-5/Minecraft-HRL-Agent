@@ -84,6 +84,16 @@ def parse_args():
         help="Save checkpoint every N timesteps"
     )
     
+    # Environment conditioning
+    parser.add_argument(
+        "--env-aware", action="store_true",
+        help="Include biome/structure one-hot encoding in observation (env-aware condition)"
+    )
+    parser.add_argument(
+        "--no-context-reward", action="store_true",
+        help="Disable ContextRewardShaper — use base tech tree reward only (env-blind baseline)"
+    )
+
     # Misc
     parser.add_argument(
         "--seed", type=int, default=42,
@@ -117,11 +127,14 @@ def train(args):
     
     # Create environment
     print("\n[Main] Creating environment...")
+    print(f"  env_aware={args.env_aware}  context_reward={not args.no_context_reward}")
     env = make_minecraft_env(
         host=args.host,
         port=args.port,
         flatten=True,
-        render_mode="human" if args.render else None
+        render_mode="human" if args.render else None,
+        env_aware=args.env_aware,
+        context_reward=not args.no_context_reward,
     )
     
     # Connect to Mineflayer bot

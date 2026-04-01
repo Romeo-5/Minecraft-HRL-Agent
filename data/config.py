@@ -31,6 +31,7 @@ SKILL_VOCAB = [
     "craft_torch",
     # Stone
     "mine_stone",
+    "mine_coal",
     "craft_stone_pickaxe",
     # Iron path
     "mine_iron_ore",

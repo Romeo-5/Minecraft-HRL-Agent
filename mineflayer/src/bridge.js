@@ -203,7 +203,10 @@ class Bridge {
             
             // Biome
             biome: this._getCurrentBiome(),
-            
+
+            // Nearby structures (heuristic detection via signature blocks)
+            nearby_structures: this._detectNearbyStructures(),
+
             // Held item
             held_item: this.bot.heldItem?.name || null
         };
@@ -289,6 +292,92 @@ class Bridge {
         } catch {
             return 'unknown';
         }
+    }
+
+    _detectNearbyStructures() {
+        const structures = [];
+        const pos = this.bot.entity.position;
+        const reg = this.bot.registry.blocksByName;
+
+        try {
+            // Blacksmith: lava source + chest within 16 blocks
+            const lavaId  = reg['lava']?.id;
+            const chestId = reg['chest']?.id;
+            if (lavaId && chestId) {
+                const lava  = this.bot.findBlock({ matching: lavaId,  maxDistance: 16 });
+                const chest = this.bot.findBlock({ matching: chestId, maxDistance: 16 });
+                if (lava && chest) structures.push('blacksmith');
+            }
+
+            // Village: villager entity within 48 blocks
+            const villager = Object.values(this.bot.entities).find(
+                e => e.name === 'villager' &&
+                     e.position.distanceTo(pos) <= 48
+            );
+            if (villager) structures.push('village');
+
+            // Desert temple: orange terracotta within 32 blocks
+            const orangeId = reg['orange_terracotta']?.id;
+            if (orangeId) {
+                const ot = this.bot.findBlock({ matching: orangeId, maxDistance: 32 });
+                if (ot) structures.push('desert_temple');
+            }
+
+            // Jungle temple: mossy_cobblestone in jungle-ish area within 32 blocks
+            const mossyId = reg['mossy_cobblestone']?.id;
+            if (mossyId) {
+                const mc = this.bot.findBlock({ matching: mossyId, maxDistance: 32 });
+                if (mc) {
+                    // mossy_cobblestone also signals dungeon — distinguish by spawner
+                    const spawnerId = reg['spawner']?.id;
+                    if (spawnerId) {
+                        const spawner = this.bot.findBlock({ matching: spawnerId, maxDistance: 20 });
+                        if (spawner) {
+                            structures.push('dungeon');
+                        } else {
+                            structures.push('jungle_temple');
+                        }
+                    } else {
+                        structures.push('jungle_temple');
+                    }
+                }
+            }
+
+            // Mineshaft: oak_fence underground (y < 40) within 32 blocks
+            const fenceId = reg['oak_fence']?.id;
+            if (fenceId && pos.y < 40) {
+                const fence = this.bot.findBlock({ matching: fenceId, maxDistance: 32 });
+                if (fence) structures.push('mineshaft');
+            }
+
+            // Ruined portal: crying_obsidian within 32 blocks
+            const cryingId = reg['crying_obsidian']?.id;
+            if (cryingId) {
+                const co = this.bot.findBlock({ matching: cryingId, maxDistance: 32 });
+                if (co) structures.push('ruined_portal');
+            }
+
+            // Igloo: snow_block + white_wool within 16 blocks
+            const snowId = reg['snow_block']?.id;
+            const woolId = reg['white_wool']?.id;
+            if (snowId && woolId) {
+                const snow = this.bot.findBlock({ matching: snowId, maxDistance: 16 });
+                const wool = this.bot.findBlock({ matching: woolId, maxDistance: 16 });
+                if (snow && wool) structures.push('igloo');
+            }
+
+            // Shipwreck: spruce_planks in water / at low y
+            const spruceId = reg['spruce_planks']?.id;
+            if (spruceId && pos.y <= 64) {
+                const sp = this.bot.findBlock({ matching: spruceId, maxDistance: 32 });
+                if (sp && sp.y <= 62) structures.push('shipwreck');
+            }
+
+        } catch (e) {
+            // Structure detection is best-effort — never crash the state builder
+        }
+
+        return structures.length > 0 ? structures : ['none'];
     }
 
     _checkDone() {
