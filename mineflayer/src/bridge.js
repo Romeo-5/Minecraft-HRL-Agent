@@ -16,6 +16,21 @@
 
 const WebSocket = require('ws');
 
+// RCON config — must match server.properties
+const RCON_PORT     = 25575;
+const RCON_PASSWORD = 'hrltraining';
+
+// How long (ms) a single skill is allowed to run before being force-aborted
+const SKILL_TIMEOUT_MS = 90_000;
+
+// Stuck-detection thresholds
+const STUCK_CHECK_INTERVAL_MS = 5_000;   // poll every 5 s
+const STUCK_MOVE_THRESHOLD    = 0.5;     // blocks — less than this = "not moved"
+const STUCK_L1_MS = 15_000;   // 15 s → jump + walk
+const STUCK_L2_MS = 30_000;   // 30 s → mine surrounding blocks
+const STUCK_L3_MS = 60_000;   // 60 s → place block beneath + jump
+const STUCK_L4_MS = 90_000;   // 90 s → RCON /kill (respawn resets position)
+
 class Bridge {
     constructor(bot, skillManager, port = 8765) {
         this.bot = bot;
@@ -25,6 +40,18 @@ class Bridge {
         this.client = null;
         this.episodeSteps = 0;
         this.maxEpisodeSteps = 1000;
+
+        // Repeat-action tracking
+        this._lastSkillId    = null;
+        this._repeatCount    = 0;
+        this.REPEAT_GRACE    = 2;    // allow up to this many consecutive repeats for free
+        this.REPEAT_PENALTY  = -0.2; // reward deduction per repeat beyond the grace window
+
+        // Stuck-detection state
+        this._lastPos        = null;
+        this._lastMoveTime   = Date.now();
+        this._stuckLevel     = 0;       // highest escape level already tried
+        this._stuckInterval  = null;
     }
 
     /**
@@ -32,8 +59,9 @@ class Bridge {
      */
     start() {
         this.wss = new WebSocket.Server({ port: this.port });
-        
+
         console.log(`[Bridge] WebSocket server started on port ${this.port}`);
+        this._startStuckDetector();
         
         this.wss.on('connection', (ws) => {
             console.log('[Bridge] Python client connected');
@@ -100,9 +128,20 @@ class Bridge {
      */
     async _handleStep(skillId) {
         this.episodeSteps++;
-        
+
+        // Hard cap: if a skill hangs longer than SKILL_TIMEOUT_MS, abort it.
+        // This prevents a single pathfinder deadlock from stalling training forever.
+        const skillPromise   = this.skillManager.executeSkill(skillId);
+        const timeoutPromise = new Promise(resolve =>
+            setTimeout(() => {
+                console.warn(`[Bridge] Skill ${skillId} timed out after ${SKILL_TIMEOUT_MS / 1000}s — aborting`);
+                try { this.bot.pathfinder.stop(); } catch (_) {}
+                resolve({ success: false, message: `Skill timed out`, reward: -0.5 });
+            }, SKILL_TIMEOUT_MS)
+        );
+
         // Execute the skill
-        const result = await this.skillManager.executeSkill(skillId);
+        const result = await Promise.race([skillPromise, timeoutPromise]);
         
         // Get new state
         const state = this._getState();
@@ -110,6 +149,22 @@ class Bridge {
         // Check termination conditions
         const done = this._checkDone();
         
+        // ── Consecutive repeat penalty ──────────────────────────────────────
+        // Penalise calling the same skill back-to-back more than REPEAT_GRACE
+        // times in a row. This discourages crafting 10 wooden pickaxes or
+        // spamming explore when no progress is being made.
+        let repeatPenalty = 0;
+        if (skillId === this._lastSkillId) {
+            this._repeatCount++;
+            if (this._repeatCount > this.REPEAT_GRACE) {
+                repeatPenalty = this.REPEAT_PENALTY;
+            }
+        } else {
+            this._lastSkillId = skillId;
+            this._repeatCount = 1;
+        }
+        // ────────────────────────────────────────────────────────────────────
+
         // Build info dict (DEPS-style error feedback)
         const info = {
             skill_executed: skillId,
@@ -117,13 +172,15 @@ class Bridge {
             skill_success: result.success,
             skill_message: result.message,
             steps: this.episodeSteps,
-            inventory_count: Object.keys(state.inventory).length
+            inventory_count: Object.keys(state.inventory).length,
+            repeat_count: this._repeatCount,
+            repeat_penalty: repeatPenalty
         };
-        
+
         return {
             type: 'step_result',
             state: state,
-            reward: result.reward,
+            reward: result.reward + repeatPenalty,
             done: done,
             truncated: this.episodeSteps >= this.maxEpisodeSteps,
             info: info
@@ -135,7 +192,10 @@ class Bridge {
      */
     async _handleReset() {
         this.episodeSteps = 0;
-        
+        this._lastSkillId = null;
+        this._repeatCount = 0;
+        this._resetStuckState();
+
         // Note: True reset would require server commands or respawn
         // For now, we just return the current state
         console.log('[Bridge] Environment reset (soft reset)');
@@ -421,10 +481,231 @@ class Bridge {
      * Stop the WebSocket server
      */
     stop() {
+        if (this._stuckInterval) {
+            clearInterval(this._stuckInterval);
+            this._stuckInterval = null;
+        }
         if (this.wss) {
             this.wss.close();
             console.log('[Bridge] WebSocket server stopped');
         }
+    }
+
+    // ─────────────────────────────────────────────
+    //  STUCK DETECTION & ESCAPE
+    // ─────────────────────────────────────────────
+
+    _resetStuckState() {
+        this._lastPos      = null;
+        this._lastMoveTime = Date.now();
+        this._stuckLevel   = 0;
+    }
+
+    _startStuckDetector() {
+        this._resetStuckState();
+
+        // Also reset when the bot respawns after a kill
+        this.bot.on('spawn', () => {
+            console.log('[StuckDetector] Bot spawned/respawned — resetting stuck state');
+            this._resetStuckState();
+        });
+
+        this._stuckInterval = setInterval(() => this._checkStuck(), STUCK_CHECK_INTERVAL_MS);
+        console.log('[StuckDetector] Started');
+    }
+
+    async _checkStuck() {
+        if (!this.bot?.entity) return;
+
+        const pos  = this.bot.entity.position;
+        const now  = Date.now();
+
+        if (!this._lastPos) {
+            this._lastPos = pos.clone();
+            return;
+        }
+
+        const moved = pos.distanceTo(this._lastPos);
+
+        if (moved > STUCK_MOVE_THRESHOLD) {
+            // Bot has moved — reset everything
+            this._lastPos      = pos.clone();
+            this._lastMoveTime = now;
+            this._stuckLevel   = 0;
+            return;
+        }
+
+        const stuckMs = now - this._lastMoveTime;
+
+        if (stuckMs >= STUCK_L4_MS && this._stuckLevel < 4) {
+            this._stuckLevel = 4;
+            console.warn(`[StuckDetector] L4 (${stuckMs / 1000}s stuck) — RCON kill`);
+            await this._rconKill();
+            this._lastMoveTime = now; // give it time to respawn before next check
+
+        } else if (stuckMs >= STUCK_L3_MS && this._stuckLevel < 3) {
+            this._stuckLevel = 3;
+            console.warn(`[StuckDetector] L3 (${stuckMs / 1000}s stuck) — place block + jump`);
+            await this._escapePlaceBlock();
+
+        } else if (stuckMs >= STUCK_L2_MS && this._stuckLevel < 2) {
+            this._stuckLevel = 2;
+            console.warn(`[StuckDetector] L2 (${stuckMs / 1000}s stuck) — mine surrounding blocks`);
+            await this._escapeMineAround();
+
+        } else if (stuckMs >= STUCK_L1_MS && this._stuckLevel < 1) {
+            this._stuckLevel = 1;
+            console.warn(`[StuckDetector] L1 (${stuckMs / 1000}s stuck) — jump + walk`);
+            await this._escapeJumpWalk();
+        }
+    }
+
+    /** L1: stop pathfinder, jump 3×, walk in a random direction for 1 s */
+    async _escapeJumpWalk() {
+        try {
+            this.bot.pathfinder.stop();
+        } catch (_) {}
+
+        try {
+            for (let i = 0; i < 3; i++) {
+                this.bot.setControlState('jump', true);
+                await this._wait(300);
+                this.bot.setControlState('jump', false);
+                await this._wait(200);
+            }
+            const dirs = ['forward', 'back', 'left', 'right'];
+            const dir  = dirs[Math.floor(Math.random() * dirs.length)];
+            this.bot.setControlState(dir, true);
+            await this._wait(1000);
+            this.bot.setControlState(dir, false);
+        } catch (e) {
+            console.warn('[StuckDetector] L1 escape error:', e.message);
+        }
+    }
+
+    /** L2: mine every non-air block within 1 block in all 6 directions */
+    async _escapeMineAround() {
+        try {
+            this.bot.pathfinder.stop();
+        } catch (_) {}
+
+        const pos = this.bot.entity.position;
+        const offsets = [
+            [0, 0, 0], [0, 1, 0], [0, -1, 0],
+            [1, 0, 0], [-1, 0, 0], [0, 0, 1], [0, 0, -1],
+            [1, 1, 0], [-1, 1, 0], [0, 1, 1], [0, 1, -1]
+        ];
+
+        for (const [dx, dy, dz] of offsets) {
+            try {
+                const block = this.bot.blockAt(pos.offset(dx, dy, dz));
+                if (block && !['air', 'water', 'lava'].includes(block.name)) {
+                    await this.bot.dig(block);
+                }
+            } catch (_) {}
+        }
+
+        // Jump after clearing space
+        this.bot.setControlState('jump', true);
+        await this._wait(400);
+        this.bot.setControlState('jump', false);
+    }
+
+    /** L3: place a dirt/cobblestone block beneath the bot (if floating), then jump */
+    async _escapePlaceBlock() {
+        try {
+            this.bot.pathfinder.stop();
+        } catch (_) {}
+
+        try {
+            // Find a placeable block in inventory (dirt, cobblestone, any solid)
+            const placeable = this.bot.inventory.items().find(i =>
+                ['dirt', 'cobblestone', 'cobbled_deepslate', 'gravel',
+                 'stone', 'sand', 'oak_planks'].includes(i.name)
+            );
+
+            if (placeable) {
+                const blockBelow = this.bot.blockAt(this.bot.entity.position.offset(0, -1, 0));
+                if (blockBelow && blockBelow.name === 'air') {
+                    // Bot is floating — place block beneath
+                    const ref = this.bot.blockAt(this.bot.entity.position.offset(0, -2, 0));
+                    if (ref) {
+                        await this.bot.equip(placeable, 'hand');
+                        await this.bot.placeBlock(ref, new (require('vec3'))(0, 1, 0));
+                    }
+                }
+            }
+        } catch (_) {}
+
+        // Jump regardless
+        this.bot.setControlState('jump', true);
+        await this._wait(500);
+        this.bot.setControlState('jump', false);
+    }
+
+    /**
+     * L4: Kill the bot via RCON so it respawns at its spawn point.
+     * Uses the raw RCON TCP protocol — no extra npm packages needed.
+     */
+    async _rconKill() {
+        const killed = await this._rconCommand(`kill ${this.bot.username}`);
+        if (killed) {
+            console.log('[StuckDetector] Bot killed via RCON — waiting for respawn');
+        } else {
+            // RCON unavailable — try chat command as last-ditch (works if bot is op'd)
+            console.warn('[StuckDetector] RCON failed — trying /kill via chat');
+            try { this.bot.chat('/kill'); } catch (_) {}
+        }
+    }
+
+    /**
+     * Send a command to the server via raw RCON TCP.
+     * Packet format: [int32 length][int32 requestId][int32 type][payload\0\0]
+     */
+    _rconCommand(command) {
+        return new Promise(resolve => {
+            const net = require('net');
+            const client = new net.Socket();
+            let authed = false;
+            let buf = Buffer.alloc(0);
+
+            const send = (type, id, payload) => {
+                const body = Buffer.from(payload + '\x00\x00', 'utf8');
+                const pkt  = Buffer.alloc(4 + 4 + 4 + body.length);
+                pkt.writeInt32LE(8 + body.length, 0);
+                pkt.writeInt32LE(id, 4);
+                pkt.writeInt32LE(type, 8);
+                body.copy(pkt, 12);
+                client.write(pkt);
+            };
+
+            const cleanup = (ok) => { try { client.destroy(); } catch (_) {} resolve(ok); };
+
+            setTimeout(() => cleanup(false), 5000);
+
+            client.connect(RCON_PORT, '127.0.0.1', () => send(3, 1, RCON_PASSWORD));
+
+            client.on('data', data => {
+                buf = Buffer.concat([buf, data]);
+                while (buf.length >= 12) {
+                    const len = buf.readInt32LE(0);
+                    if (buf.length < len + 4) break;
+                    buf = buf.slice(len + 4);
+                    if (!authed) {
+                        authed = true;
+                        send(2, 2, command);   // type 2 = run command
+                    } else {
+                        cleanup(true);
+                    }
+                }
+            });
+
+            client.on('error', () => cleanup(false));
+        });
+    }
+
+    _wait(ms) {
+        return new Promise(resolve => setTimeout(resolve, ms));
     }
 }
 

@@ -73,7 +73,8 @@ class SkillManager {
             id: 3,
             name: 'craft_planks',
             description: 'Craft wooden planks from logs',
-            preconditions: () => this._hasItemLike('_log'),
+            // Stop crafting once we have a comfortable surplus (32 planks = 8 logs worth)
+            preconditions: () => this._hasItemLike('_log') && this._countItemLike('_planks') < 32,
             execute: async () => {
                 return await this._craftItem('oak_planks', 1);
             }
@@ -84,7 +85,8 @@ class SkillManager {
             id: 4,
             name: 'craft_sticks',
             description: 'Craft sticks from planks',
-            preconditions: () => this._hasItemLike('_planks'),
+            // 16 sticks covers 5+ pickaxes — no reason to hoard more
+            preconditions: () => this._hasItemLike('_planks') && this._countItem('stick') < 16,
             execute: async () => {
                 return await this._craftItem('stick', 1);
             }
@@ -95,7 +97,13 @@ class SkillManager {
             id: 5,
             name: 'craft_crafting_table',
             description: 'Craft a crafting table',
-            preconditions: () => this._countItemLike('_planks') >= 4,
+            // One crafting table is enough — check inventory AND nearby world
+            preconditions: () => {
+                if (this._countItemLike('_planks') < 4) return false;
+                if (this._hasItem('crafting_table')) return false; // already carrying one
+                const placed = this.bot.findBlock({ matching: b => b.name === 'crafting_table', maxDistance: 32 });
+                return placed === null; // only craft if none placed nearby
+            },
             execute: async () => {
                 return await this._craftItem('crafting_table', 1);
             }
@@ -106,7 +114,14 @@ class SkillManager {
             id: 6,
             name: 'craft_wooden_pickaxe',
             description: 'Craft a wooden pickaxe (requires crafting table nearby)',
-            preconditions: () => this._countItemLike('_planks') >= 3 && this._countItem('stick') >= 2,
+            // Only craft if we don't already have any pickaxe (wood or better)
+            preconditions: () =>
+                this._countItemLike('_planks') >= 3 &&
+                this._countItem('stick') >= 2 &&
+                this._countItem('wooden_pickaxe') < 1 &&
+                !this._hasItem('stone_pickaxe') &&
+                !this._hasItem('iron_pickaxe') &&
+                !this._hasItem('diamond_pickaxe'),
             execute: async () => {
                 return await this._craftWithTable('wooden_pickaxe', 1);
             }
@@ -117,7 +132,13 @@ class SkillManager {
             id: 7,
             name: 'craft_stone_pickaxe',
             description: 'Craft a stone pickaxe',
-            preconditions: () => this._countItem('cobblestone') >= 3 && this._countItem('stick') >= 2,
+            // Only craft if we don't already have a stone or better pickaxe
+            preconditions: () =>
+                this._countItem('cobblestone') >= 3 &&
+                this._countItem('stick') >= 2 &&
+                this._countItem('stone_pickaxe') < 1 &&
+                !this._hasItem('iron_pickaxe') &&
+                !this._hasItem('diamond_pickaxe'),
             execute: async () => {
                 return await this._craftWithTable('stone_pickaxe', 1);
             }
@@ -190,7 +211,11 @@ class SkillManager {
             id: 13,
             name: 'craft_furnace',
             description: 'Craft a furnace from 8 cobblestone',
-            preconditions: () => this._countItem('cobblestone') >= 8,
+            // One furnace is enough — smelt_iron will auto-craft/place one anyway
+            preconditions: () =>
+                this._countItem('cobblestone') >= 8 &&
+                this._countItem('furnace') < 1 &&
+                this.bot.findBlock({ matching: b => b.name === 'furnace', maxDistance: 32 }) === null,
             execute: async () => {
                 return await this._craftWithTable('furnace', 1);
             }
@@ -201,7 +226,12 @@ class SkillManager {
             id: 14,
             name: 'craft_iron_pickaxe',
             description: 'Craft an iron pickaxe (requires 3 iron ingots + 2 sticks + crafting table)',
-            preconditions: () => this._countItem('iron_ingot') >= 3 && this._countItem('stick') >= 2,
+            // Only craft if we don't already have an iron or diamond pickaxe
+            preconditions: () =>
+                this._countItem('iron_ingot') >= 3 &&
+                this._countItem('stick') >= 2 &&
+                this._countItem('iron_pickaxe') < 1 &&
+                !this._hasItem('diamond_pickaxe'),
             execute: async () => {
                 return await this._craftWithTable('iron_pickaxe', 1);
             }
@@ -212,7 +242,9 @@ class SkillManager {
             id: 15,
             name: 'craft_iron_helmet',
             description: 'Craft an iron helmet (5 iron ingots + crafting table)',
-            preconditions: () => this._countItem('iron_ingot') >= 5,
+            preconditions: () =>
+                this._countItem('iron_ingot') >= 5 &&
+                this._countItem('iron_helmet') < 1,
             execute: async () => {
                 return await this._craftWithTable('iron_helmet', 1);
             }
@@ -223,7 +255,9 @@ class SkillManager {
             id: 16,
             name: 'craft_iron_chestplate',
             description: 'Craft an iron chestplate (8 iron ingots + crafting table)',
-            preconditions: () => this._countItem('iron_ingot') >= 8,
+            preconditions: () =>
+                this._countItem('iron_ingot') >= 8 &&
+                this._countItem('iron_chestplate') < 1,
             execute: async () => {
                 return await this._craftWithTable('iron_chestplate', 1);
             }
@@ -234,7 +268,9 @@ class SkillManager {
             id: 17,
             name: 'craft_iron_leggings',
             description: 'Craft iron leggings (7 iron ingots + crafting table)',
-            preconditions: () => this._countItem('iron_ingot') >= 7,
+            preconditions: () =>
+                this._countItem('iron_ingot') >= 7 &&
+                this._countItem('iron_leggings') < 1,
             execute: async () => {
                 return await this._craftWithTable('iron_leggings', 1);
             }
@@ -245,7 +281,9 @@ class SkillManager {
             id: 18,
             name: 'craft_iron_boots',
             description: 'Craft iron boots (4 iron ingots + crafting table)',
-            preconditions: () => this._countItem('iron_ingot') >= 4,
+            preconditions: () =>
+                this._countItem('iron_ingot') >= 4 &&
+                this._countItem('iron_boots') < 1,
             execute: async () => {
                 return await this._craftWithTable('iron_boots', 1);
             }
@@ -289,7 +327,10 @@ class SkillManager {
             id: 22,
             name: 'craft_diamond_pickaxe',
             description: 'Craft a diamond pickaxe (3 diamonds + 2 sticks + crafting table)',
-            preconditions: () => this._countItem('diamond') >= 3 && this._countItem('stick') >= 2,
+            preconditions: () =>
+                this._countItem('diamond') >= 3 &&
+                this._countItem('stick') >= 2 &&
+                this._countItem('diamond_pickaxe') < 1,
             execute: async () => {
                 return await this._craftWithTable('diamond_pickaxe', 1);
             }
@@ -300,7 +341,9 @@ class SkillManager {
             id: 23,
             name: 'craft_diamond_helmet',
             description: 'Craft a diamond helmet (5 diamonds + crafting table)',
-            preconditions: () => this._countItem('diamond') >= 5,
+            preconditions: () =>
+                this._countItem('diamond') >= 5 &&
+                this._countItem('diamond_helmet') < 1,
             execute: async () => {
                 return await this._craftWithTable('diamond_helmet', 1);
             }
@@ -311,7 +354,9 @@ class SkillManager {
             id: 24,
             name: 'craft_diamond_chestplate',
             description: 'Craft a diamond chestplate (8 diamonds + crafting table)',
-            preconditions: () => this._countItem('diamond') >= 8,
+            preconditions: () =>
+                this._countItem('diamond') >= 8 &&
+                this._countItem('diamond_chestplate') < 1,
             execute: async () => {
                 return await this._craftWithTable('diamond_chestplate', 1);
             }
@@ -322,7 +367,9 @@ class SkillManager {
             id: 25,
             name: 'craft_diamond_leggings',
             description: 'Craft diamond leggings (7 diamonds + crafting table)',
-            preconditions: () => this._countItem('diamond') >= 7,
+            preconditions: () =>
+                this._countItem('diamond') >= 7 &&
+                this._countItem('diamond_leggings') < 1,
             execute: async () => {
                 return await this._craftWithTable('diamond_leggings', 1);
             }
@@ -333,7 +380,9 @@ class SkillManager {
             id: 26,
             name: 'craft_diamond_boots',
             description: 'Craft diamond boots (4 diamonds + crafting table)',
-            preconditions: () => this._countItem('diamond') >= 4,
+            preconditions: () =>
+                this._countItem('diamond') >= 4 &&
+                this._countItem('diamond_boots') < 1,
             execute: async () => {
                 return await this._craftWithTable('diamond_boots', 1);
             }
