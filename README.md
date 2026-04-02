@@ -56,7 +56,7 @@ Decision Transformer    T5 Planner (SFT)    RL Environment (DQN)
 │  ┌──────────────┐    ┌─────────────────┐    ┌───────────────┐  │
 │  │   WebSocket  │───▶│  Skill Manager  │───▶│  Mineflayer   │  │
 │  │    Server    │    │  (47-skill vocab│    │     API       │  │
-│  │   bridge.js  │    │   13 live)      │    │  + pathfinder │  │
+│  │   bridge.js  │    │   28 live)      │    │  + pathfinder │  │
 │  └──────────────┘    └─────────────────┘    └───────────────┘  │
 │                             │                        │          │
 │                      StuckDetector              RCON Client     │
@@ -96,10 +96,6 @@ minecraft-hrl-agent/
 │   ├── scripts/
 │   │   └── run_context_ablation.sh # Launches 2-condition ablation
 │   └── checkpoints/                # Saved model weights
-│
-├── MC_Tech_Tree/                   # Tech tree DAG + visual editor
-│   ├── tech_tree.json
-│   └── editor.html
 │
 ├── minecraft-server/               # Vanilla 1.20.1 server
 │   └── server.properties
