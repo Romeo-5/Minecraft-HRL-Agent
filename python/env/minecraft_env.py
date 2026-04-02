@@ -232,13 +232,20 @@ class MinecraftHRLEnv(gym.Env):
         return loop.run_until_complete(_connect())
     
     def _send_and_receive(self, message: dict) -> dict:
-        """Send a message and wait for response (sync wrapper)."""
+        """Send a message and wait for response, with reconnect on dropped connection."""
         async def _async_send():
             await self.ws.send(json.dumps(message))
             return json.loads(await self.ws.recv())
-            
-        loop = asyncio.get_event_loop()
-        return loop.run_until_complete(_async_send())
+
+        for attempt in range(5):
+            try:
+                loop = asyncio.get_event_loop()
+                return loop.run_until_complete(_async_send())
+            except Exception as e:
+                print(f"[Env] WebSocket error (attempt {attempt + 1}/5): {e} — reconnecting...")
+                time.sleep(3)
+                self.connect(timeout=30.0)
+        raise RuntimeError("[Env] Failed to communicate with Mineflayer after 5 reconnect attempts")
     
     def _encode_observation(self, state: dict) -> dict:
         """
@@ -250,15 +257,20 @@ class MinecraftHRLEnv(gym.Env):
         obs = {}
         
         # Health and food (normalized to [0, 1])
-        obs['health'] = np.array([state.get('health', 20) / 20.0], dtype=np.float32)
-        obs['food'] = np.array([state.get('food', 20) / 20.0], dtype=np.float32)
+        # Guard against null values sent during bot spawn before vitals are populated
+        obs['health'] = np.array([(state.get('health') or 20) / 20.0], dtype=np.float32)
+        obs['food'] = np.array([(state.get('food') or 20) / 20.0], dtype=np.float32)
         
         # Position (normalize to [-1, 1] assuming ±10000 range)
-        pos = state.get('position', {'x': 0, 'y': 64, 'z': 0})
+        # Guard against null position components sent during bot death/respawn
+        pos = state.get('position') or {}
+        pos_x = pos.get('x') or 0
+        pos_y = pos.get('y') or 64
+        pos_z = pos.get('z') or 0
         obs['position'] = np.array([
-            pos['x'] / 10000.0,
-            (pos['y'] - 64) / 64.0,  # Center around sea level
-            pos['z'] / 10000.0
+            pos_x / 10000.0,
+            (pos_y - 64) / 64.0,  # Center around sea level
+            pos_z / 10000.0
         ], dtype=np.float32).clip(-1, 1)
         
         # Inventory encoding
@@ -287,7 +299,7 @@ class MinecraftHRLEnv(gym.Env):
         obs['available_skills'] = skills_mask
         
         # Time of day
-        time_of_day = state.get('time_of_day', 0)
+        time_of_day = state.get('time_of_day') or 0
         obs['time_of_day'] = np.array([time_of_day / 24000.0], dtype=np.float32)
         obs['is_day'] = np.array([1 if state.get('is_day', True) else 0], dtype=np.int8)
 

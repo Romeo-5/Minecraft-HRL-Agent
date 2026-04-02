@@ -52,6 +52,7 @@ class Bridge {
         this._lastMoveTime   = Date.now();
         this._stuckLevel     = 0;       // highest escape level already tried
         this._stuckInterval  = null;
+        this._skillRunning   = false;   // true while _handleStep is executing a skill
     }
 
     /**
@@ -131,17 +132,24 @@ class Bridge {
 
         // Hard cap: if a skill hangs longer than SKILL_TIMEOUT_MS, abort it.
         // This prevents a single pathfinder deadlock from stalling training forever.
-        const skillPromise   = this.skillManager.executeSkill(skillId);
-        const timeoutPromise = new Promise(resolve =>
-            setTimeout(() => {
+        // IMPORTANT: store the timer handle so we can clearTimeout when the skill
+        // finishes first — otherwise the timer fires 90 s later as a "ghost" and
+        // calls pathfinder.stop() on whatever skill is running at that point.
+        this._skillRunning = true;
+        const skillPromise = this.skillManager.executeSkill(skillId);
+        let timeoutHandle;
+        const timeoutPromise = new Promise(resolve => {
+            timeoutHandle = setTimeout(() => {
                 console.warn(`[Bridge] Skill ${skillId} timed out after ${SKILL_TIMEOUT_MS / 1000}s — aborting`);
                 try { this.bot.pathfinder.stop(); } catch (_) {}
                 resolve({ success: false, message: `Skill timed out`, reward: -0.5 });
-            }, SKILL_TIMEOUT_MS)
-        );
+            }, SKILL_TIMEOUT_MS);
+        });
 
-        // Execute the skill
+        // Execute the skill; cancel the timer if the skill finishes first
         const result = await Promise.race([skillPromise, timeoutPromise]);
+        clearTimeout(timeoutHandle);
+        this._skillRunning = false;
         
         // Get new state
         const state = this._getState();
@@ -528,14 +536,23 @@ class Bridge {
         const moved = pos.distanceTo(this._lastPos);
 
         if (moved > STUCK_MOVE_THRESHOLD) {
-            // Bot has moved — reset everything
+            // Bot has moved — update position and timer.
+            // Only reset the escape level if the bot moved substantially (> 2 blocks),
+            // not on a tiny hop from L1's jump+walk.  This prevents the infinite L1 loop
+            // where a small jump resets _stuckLevel to 0 before the ladder can escalate.
             this._lastPos      = pos.clone();
             this._lastMoveTime = now;
-            this._stuckLevel   = 0;
+            if (moved > 2.0) this._stuckLevel = 0;
             return;
         }
 
         const stuckMs = now - this._lastMoveTime;
+
+        // L1 and L2 call pathfinder.stop() and bot.dig() which directly abort
+        // whatever skill is currently executing, causing spurious "Path was stopped"
+        // and "Digging aborted" failures.  Skip them while a skill is in flight;
+        // only allow L3/L4 (which ultimately kill/respawn the bot) through.
+        const skillRunning = this._skillRunning;
 
         if (stuckMs >= STUCK_L4_MS && this._stuckLevel < 4) {
             this._stuckLevel = 4;
@@ -543,17 +560,17 @@ class Bridge {
             await this._rconKill();
             this._lastMoveTime = now; // give it time to respawn before next check
 
-        } else if (stuckMs >= STUCK_L3_MS && this._stuckLevel < 3) {
+        } else if (stuckMs >= STUCK_L3_MS && this._stuckLevel < 3 && !skillRunning) {
             this._stuckLevel = 3;
             console.warn(`[StuckDetector] L3 (${stuckMs / 1000}s stuck) — place block + jump`);
             await this._escapePlaceBlock();
 
-        } else if (stuckMs >= STUCK_L2_MS && this._stuckLevel < 2) {
+        } else if (stuckMs >= STUCK_L2_MS && this._stuckLevel < 2 && !skillRunning) {
             this._stuckLevel = 2;
             console.warn(`[StuckDetector] L2 (${stuckMs / 1000}s stuck) — mine surrounding blocks`);
             await this._escapeMineAround();
 
-        } else if (stuckMs >= STUCK_L1_MS && this._stuckLevel < 1) {
+        } else if (stuckMs >= STUCK_L1_MS && this._stuckLevel < 1 && !skillRunning) {
             this._stuckLevel = 1;
             console.warn(`[StuckDetector] L1 (${stuckMs / 1000}s stuck) — jump + walk`);
             await this._escapeJumpWalk();
